@@ -1,0 +1,100 @@
+
+:root {
+  --neon-green: #00ff41;
+  --electric-blue: #00d4ff; /* El azul claro solicitado */
+  --neon-shadow: 0 0 15px rgba(0, 255, 65, 0.4);
+  --blue-shadow: 0 0 15px rgba(0, 212, 255, 0.4);
+  --glass-bg: rgba(255, 255, 255, 0.05);
+  --glass-border: rgba(255, 255, 255, 0.1);
+  --brand-blue: #00d2ff; /* El azul claro que mencionaste */
+  --color-azul: #0070f3;
+  --color-verde: #00ff41;
+  --color-amarillo: #fbbf24;
+  --color-naranja: #f59e0b;
+  --color-rojo: #ef4444;
+}
+
+/* Clase de utilidad para usar el azul */
+.neon-text-blue {
+  color: var(--electric-blue);
+  text-shadow: 0 0 5px var(--electric-blue);
+}
+
+.btn-blue {
+  border: 1px solid var(--electric-blue);
+  color: var(--electric-blue);
+  transition: 0.3s;
+}
+
+.btn-blue:hover {
+  background: var(--electric-blue);
+  color: black;
+  box-shadow: var(--blue-shadow);
+}
+body {
+  background:
+    linear-gradient(rgba(0, 0, 0, 0.8), rgba(0, 0, 0, 0.8)),
+    url('/Uranus-background.png'); /* Tu imagen de fondo */
+  background-size: cover;
+  background-attachment: fixed;
+  color: white;
+  font-family: 'Segoe UI', sans-serif;
+}
+
+/* Tarjeta estilo Cristal */
+.glass-card {
+  background: var(--glass-bg);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  border: 1px solid var(--glass-border);
+  border-radius: 16px;
+  box-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.37);
+  transition: all 0.3s ease;
+}
+
+/* Detalles Neón para resaltar */
+.neon-border {
+  border: 1px solid var(--neon-green) !important;
+  box-shadow: var(--neon-shadow);
+}
+
+.neon-text {
+  color: var(--neon-green);
+  text-shadow: 0 0 5px var(--neon-green);
+}
+
+/* Botón Neón */
+.btn-neon {
+  background: transparent;
+  color: var(--neon-green);
+  padding: 10px 20px;
+  border-radius: 8px;
+  text-transform: uppercase;
+  font-weight: bold;
+  cursor: pointer;
+  transition: 0.3s;
+}
+
+.btn-neon:hover {
+  background: var(--neon-green);
+  color: black;
+  box-shadow: 0 0 20px var(--neon-green);
+}
+
+.app-container {
+  display: flex; /* Alinea hijos horizontalmente */
+  min-height: 100vh;
+  width: 100%;
+}
+
+.sidebar-container {
+  width: 280px; /* Ancho fijo para tu sidebar */
+  flex-shrink: 0; /* Que no se haga chiquito */
+}
+
+.main-content-grid {
+  flex-grow: 1; /* Que ocupe todo el resto del espacio */
+  padding: 20px;
+  overflow-y: auto; /* Scroll independiente para el contenido */
+}
+

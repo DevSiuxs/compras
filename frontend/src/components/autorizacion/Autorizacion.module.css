@@ -1,0 +1,123 @@
+.container {
+  display: flex;
+  height: calc(100vh - 70px);
+  background: #050505;
+  color: #e0e0e0;
+  font-family: 'Inter', sans-serif;
+  --azul: #0070f3;
+  --verde: #00ff41;
+  --amarillo: #ffca28;
+  --naranja: #ff9800;
+  --rojo: #ff4d4d;
+  --brand: #00d2ff;
+}
+
+/* Sidebar */
+.sidebar {
+  width: 320px;
+  background: #0d0d0d;
+  border-right: 1px solid #1a1a1a;
+  display: flex;
+  flex-direction: column;
+}
+
+.sidebarHeader {
+  padding: 1.5rem;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  border-bottom: 1px solid #1a1a1a;
+}
+
+.sidebarHeader h2 {
+  font-size: 11px;
+  letter-spacing: 2px;
+  color: #444;
+  margin: 0;
+}
+
+/* Campana y Notificaciones */
+.notifWrapper { position: relative; }
+.bellBtn {
+  background: #111; border: 1px solid #222; font-size: 1.2rem; cursor: pointer;
+  padding: 8px; border-radius: 10px; position: relative; transition: 0.3s;
+}
+.pulse { animation: bellPulse 2s infinite; border-color: var(--brand); }
+@keyframes bellPulse {
+  0% { box-shadow: 0 0 0 0 rgba(0, 210, 255, 0.4); }
+  70% { box-shadow: 0 0 0 10px rgba(0, 210, 255, 0); }
+  100% { box-shadow: 0 0 0 0 rgba(0, 210, 255, 0); }
+}
+
+.countBadge {
+  position: absolute; top: -5px; right: -5px; background: #ff4d4d; color: white;
+  font-size: 10px; font-weight: bold; padding: 2px 6px; border-radius: 10px; border: 2px solid #0a0a0a;
+}
+
+.msgDropdown {
+  position: absolute; top: 45px; right: 0; width: 280px; background: #0d0d0d; border: 1px solid #333;
+  border-radius: 12px; padding: 1rem; box-shadow: 0 10px 40px rgba(0,0,0,0.8); z-index: 100;
+}
+.msgDropdown h4 { font-size: 10px; color: #555; margin-bottom: 10px; letter-spacing: 1px; }
+
+.msgItem { padding: 10px; border-radius: 8px; cursor: pointer; margin-top: 8px; background: #000; border: 1px solid #1a1a1a; }
+.msgItem:hover { border-color: var(--brand); }
+.msgFolio { font-size: 10px; font-weight: bold; color: var(--brand); }
+.msgItem p { font-size: 11px; color: #888; margin: 0; }
+
+/* Listado de Solicitudes */
+.solList { flex: 1; overflow-y: auto; }
+.solCard { padding: 1.5rem; border-bottom: 1px solid #151515; cursor: pointer; display: flex; justify-content: space-between; align-items: center; transition: 0.2s; }
+.solCard:hover { background: #111; }
+.active { background: #111; border-left: 4px solid var(--brand); }
+.hasNotif { background: rgba(0, 210, 255, 0.03); }
+
+.folioText { display: block; font-weight: 800; font-size: 14px; color: #fff; }
+.empresaText { font-size: 10px; color: #555; text-transform: uppercase; }
+.blueDot { width: 8px; height: 8px; background: var(--brand); border-radius: 50%; box-shadow: 0 0 10px var(--brand); }
+
+/* Main Content */
+.main { flex: 1; padding: 3rem; overflow-y: auto; background: radial-gradient(circle at top right, #0a0a0a 0%, #050505 100%); }
+
+.header { display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 3rem; }
+.headerTitle h1 { font-size: 2.5rem; font-weight: 900; margin: 0; letter-spacing: -1px; }
+.headerTitle p { color: #555; font-size: 14px; margin-top: 5px; }
+
+.budgetControl { text-align: right; }
+.budgetControl p { font-size: 10px; color: #555; letter-spacing: 1px; }
+.budgetControl span { display: block; font-size: 1.8rem; color: var(--brand); font-weight: 900; text-shadow: 0 0 20px rgba(0, 210, 255, 0.2); }
+
+.inputGroup { display: flex; gap: 8px; margin-top: 10px; justify-content: flex-end; }
+.inputGroup input { background: #000; border: 1px solid #222; color: #fff; padding: 8px 12px; border-radius: 8px; width: 130px; font-size: 12px; outline: none; }
+.inputGroup input:focus { border-color: var(--brand); }
+.inputGroup button { background: var(--brand); border: none; padding: 8px 15px; border-radius: 8px; font-size: 10px; font-weight: 900; cursor: pointer; transition: 0.3s; }
+.inputGroup button:hover { transform: scale(1.05); box-shadow: 0 0 15px var(--brand); }
+
+/* Alerta */
+.alertBox { background: rgba(0, 210, 255, 0.08); border: 1px solid var(--brand); padding: 1.5rem; border-radius: 15px; display: flex; gap: 1rem; margin-bottom: 2rem; align-items: center; animation: slideDown 0.4s ease; }
+@keyframes slideDown { from { opacity: 0; transform: translateY(-10px); } to { opacity: 1; transform: translateY(0); } }
+
+/* Selector de Color Original */
+.colorSelector { display: flex; align-items: center; gap: 20px; margin-bottom: 3rem; background: #0d0d0d; padding: 1rem 2rem; border-radius: 50px; width: fit-content; border: 1px solid #1a1a1a; }
+.label { font-size: 11px; font-weight: 900; color: #444; letter-spacing: 1px; }
+.colorOptions { display: flex; gap: 12px; }
+.colorBtn { width: 28px; height: 28px; border-radius: 50%; border: 3px solid transparent; cursor: pointer; transition: 0.3s; }
+.colorActive { border-color: #fff; transform: scale(1.2); box-shadow: 0 0 15px rgba(255, 255, 255, 0.3); }
+
+/* Cotizaciones Original */
+.cotizacionesGrid { display: grid; grid-template-columns: 1fr 1fr; gap: 2rem; }
+.cotCard { background: #0d0d0d; border: 1px solid #1a1a1a; padding: 2.5rem; border-radius: 24px; transition: 0.3s; position: relative; }
+.cotCard:hover { border-color: #333; transform: translateY(-5px); }
+.cotCard.locked { opacity: 0.4; border-color: #300; }
+
+.cotHeader span { font-size: 11px; color: #555; text-transform: uppercase; letter-spacing: 1px; }
+.monto { font-size: 2.5rem; font-weight: 900; color: #fff; margin: 10px 0; }
+
+.cotBody { margin: 2rem 0; font-size: 13px; color: #888; }
+.cotBody p { margin: 5px 0; }
+.cotBody strong { color: #ccc; }
+
+.mainAction { background: #fff; color: #000; border: none; padding: 1.2rem; border-radius: 12px; font-weight: 900; width: 100%; cursor: pointer; transition: 0.3s; }
+.mainAction:hover:not(:disabled) { background: var(--brand); box-shadow: 0 0 20px var(--brand); }
+
+.empty { height: 60vh; display: flex; align-items: center; justify-content: center; color: #222; font-size: 12px; text-transform: uppercase; letter-spacing: 4px; }

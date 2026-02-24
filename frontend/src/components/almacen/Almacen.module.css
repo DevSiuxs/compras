@@ -1,0 +1,63 @@
+.container {
+  width: 100%;
+  max-width: 1000px;
+  margin: 0 auto;
+}
+
+.card {
+  background: #111;
+  border: 1px solid rgba(0, 255, 65, 0.2);
+  padding: 1.5rem;
+  border-radius: 8px;
+  margin-bottom: 1rem;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  transition: all 0.3s ease;
+}
+
+.card:hover {
+  border-color: #00ff41;
+  box-shadow: 0 0 10px rgba(0, 255, 65, 0.1);
+}
+
+.folio {
+  font-family: monospace;
+  color: #00ff41;
+  font-size: 0.75rem;
+  letter-spacing: 1px;
+}
+
+.btnSurtir {
+  background: #00ff41;
+  color: black;
+  font-weight: bold;
+  padding: 0.6rem 1.2rem;
+  border-radius: 4px;
+  font-size: 0.7rem;
+  cursor: pointer;
+  border: none;
+  transition: 0.3s;
+}
+
+.btnSurtir:hover {
+  box-shadow: 0 0 15px #00ff41;
+  transform: scale(1.05);
+}
+
+.btnNoStock {
+  background: transparent;
+  color: #ff4141;
+  border: 1px solid #ff4141;
+  font-weight: bold;
+  padding: 0.6rem 1.2rem;
+  border-radius: 4px;
+  font-size: 0.7rem;
+  cursor: pointer;
+  transition: 0.3s;
+}
+
+.btnNoStock:hover {
+  background: rgba(255, 65, 65, 0.1);
+  box-shadow: 0 0 10px #ff4141;
+}

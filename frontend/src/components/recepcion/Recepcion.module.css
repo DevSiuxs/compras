@@ -1,0 +1,35 @@
+.container { width: 100%; }
+.neonText { color: #00d4ff; text-shadow: 0 0 10px rgba(0, 212, 255, 0.5); font-weight: bold; margin-bottom: 20px; }
+
+.solCard {
+  background: #111;
+  padding: 15px;
+  margin-bottom: 8px;
+  cursor: pointer;
+  border-right: 4px solid #333;
+  transition: 0.3s;
+}
+
+.solCard.active { border-color: #00ff41; background: #0a1a0a; }
+
+.glassForm {
+  background: rgba(15, 15, 15, 0.9);
+  padding: 2rem;
+  border: 1px solid #00ff41;
+  border-radius: 8px;
+}
+
+.input {
+  width: 100%; background: #000; border: 1px solid #333;
+  color: #fff; padding: 12px; border-radius: 4px; outline: none;
+}
+
+.input:focus { border-color: #00d4ff; }
+
+.infoBox { background: #000; padding: 10px; border: 1px dashed #333; margin: 10px 0; }
+
+.btnFinalizar {
+  width: 100%; padding: 15px; background: #00ff41;
+  color: #000; font-weight: bold; border: none; border-radius: 4px;
+  cursor: pointer; text-transform: uppercase;
+}

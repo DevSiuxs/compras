@@ -1,0 +1,106 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "mysql"
+  url      = env("DATABASE_URL")
+}
+
+// --- 1. CATÁLOGOS (Administrados desde el componente Admin) ---
+
+model Unidad {
+  id     Int             @id @default(autoincrement())
+  nombre String          @unique
+  items  ItemSolicitud[]
+}
+
+model Empresa {
+  id          Int         @id @default(autoincrement())
+  nombre      String      @unique
+  solicitudes Solicitud[]
+}
+
+// --- 2. PRESUPUESTO GLOBAL ---
+
+model ConfiguracionGlobal {
+  id                Int   @id @default(1)
+  presupuestoGlobal Float @default(0)
+}
+
+// --- 3. SOLICITUDES ---
+
+model Solicitud {
+  id               Int      @id @default(autoincrement())
+  folio            String   @unique
+  fechaCreacion    DateTime @default(now())
+
+  // Para control del semáforo
+  fechaResetColor  DateTime @default(now())
+
+  // FECHA DE CIERRE: Vital para el Dashboard (saber en qué mes se gastó)
+  fechaFinalizado  DateTime?
+
+  justificacion    String   @db.Text
+  area             String
+
+  // Status: SOLICITADO, ALMACEN, COTIZANDO, AUTORIZAR, COMPRAR, PAGADO, RECHAZADO
+  status           String   @default("SOLICITADO")
+
+  // Prioridad (Colores): AZUL, VERDE, AMARILLO, NARANJA, ROJO
+  prioridad        String   @default("AZUL")
+
+  // --- DATOS DE CONSOLIDACIÓN (Para el Dashboard) ---
+  // Guardamos esto aquí para no tener que buscar siempre en la tabla de cotizaciones
+  montoFinal       Float?    // El total exacto que se pagó
+  proveedorFinal   String?   // El proveedor que ganó la licitación
+  compradorId      Int?      // Quién ejecutó la compra final
+
+  // Relación con Empresa
+  idEmpresa        Int
+  empresa          Empresa  @relation(fields: [idEmpresa], references: [id])
+
+  items            ItemSolicitud[]
+  cotizaciones     Cotizacion[]
+  mensajes         Mensaje[]
+}
+
+model ItemSolicitud {
+  id          Int       @id @default(autoincrement())
+  descripcion String    // Input 1: Material / Producto
+  cantidad    Float     // Input 2
+  idUnidad    Int       // Input 3
+  unidad      Unidad    @relation(fields: [idUnidad], references: [id])
+  solicitudId Int
+  solicitud   Solicitud @relation(fields: [solicitudId], references: [id])
+}
+
+// --- 4. COTIZACIONES ---
+
+model Cotizacion {
+  id            Int       @id @default(autoincrement())
+  proveedor     String
+  monto         Float
+  quienCotizo   String
+  observaciones String?   @db.Text
+  seleccionada  Boolean   @default(false)
+  createdAt DateTime @default(now())
+
+  solicitudId   Int
+  solicitud     Solicitud @relation(fields: [solicitudId], references: [id])
+  fechaCreacion DateTime  @default(now())
+}
+
+// --- 5. MENSAJES (Para comunicación de presupuesto u observaciones) ---
+
+// En el modelo Solicitud, asegúrate de que el status incluya:
+// "PENDIENTE_PRESUPUESTO" para cuando compras mande el mensaje.
+
+model Mensaje {
+  id          Int       @id @default(autoincrement())
+  motivo      String    @db.Text
+  fecha       DateTime  @default(now())
+  leido       Boolean   @default(false) // <-- Añadido para notificaciones en Autorizar
+  solicitudId Int
+  solicitud   Solicitud @relation(fields: [solicitudId], references: [id])
+}

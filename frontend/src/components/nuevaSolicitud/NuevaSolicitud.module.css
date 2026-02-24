@@ -1,0 +1,37 @@
+.container {
+  width: 100%;
+  max-width: 800px;
+  margin: 0 auto;
+}
+
+.input {
+  width: 100%;
+  background: #111;
+  border: 1px solid rgba(0, 255, 65, 0.2);
+  color: white;
+  padding: 10px;
+  font-size: 0.8rem;
+  border-radius: 4px;
+  outline: none;
+}
+
+.input:focus {
+  border-color: #00ff41;
+}
+
+.btnNeon {
+  width: 100%;
+  padding: 15px;
+  background: transparent;
+  border: 1px solid #00ff41;
+  color: #00ff41;
+  font-weight: bold;
+  cursor: pointer;
+  transition: 0.3s;
+}
+
+.btnNeon:hover {
+  background: #00ff41;
+  color: black;
+  box-shadow: 0 0 20px #00ff41;
+}
