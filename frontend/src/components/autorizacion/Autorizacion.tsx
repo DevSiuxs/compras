@@ -1,24 +1,30 @@
 'use client';
 import { useState, useEffect } from 'react';
 import styles from './Autorizacion.module.css';
+// Importaciones de configuración y tipos
+import { ENDPOINTS, getHeaders } from '@/config/apiConfig';
+import { SolicitudAutorizable, Cotizacion, PrioridadColor, MensajeHistorial } from '@/types';
 
 export default function Autorizar() {
-  const [pendientes, setPendientes] = useState<any[]>([]);
+  // Se usan los tipos definidos en tu index.ts
+  const [pendientes, setPendientes] = useState<SolicitudAutorizable[]>([]);
   const [presupuesto, setPresupuesto] = useState(0);
-  const [seleccionada, setSeleccionada] = useState<any>(null);
+  const [seleccionada, setSeleccionada] = useState<SolicitudAutorizable | null>(null);
   const [nuevoMonto, setNuevoMonto] = useState<string>("");
-  const [colorManual, setColorManual] = useState<string>("AZUL");
+  const [colorManual, setColorManual] = useState<PrioridadColor>("AZUL");
   const [showMsjs, setShowMsjs] = useState(false);
 
-  const colores = ["AZUL", "VERDE", "AMARILLO", "NARANJA", "ROJO"];
+  const colores: PrioridadColor[] = ["AZUL", "VERDE", "AMARILLO", "NARANJA", "ROJO"];
 
   const cargarDatos = async () => {
     try {
-      const resP = await fetch('http://localhost:3000/autorizacion/presupuesto');
+      const headers = getHeaders();
+      // Uso de ENDPOINTS centralizados
+      const resP = await fetch(ENDPOINTS.AUTORIZACION.PRESUPUESTO, { headers });
       const dataP = await resP.json();
       setPresupuesto(dataP?.presupuestoGlobal || 0);
 
-      const resS = await fetch('http://localhost:3000/autorizacion/pendientes');
+      const resS = await fetch(ENDPOINTS.AUTORIZACION.PENDIENTES, { headers });
       const dataS = await resS.json();
       setPendientes(Array.isArray(dataS) ? dataS : []);
     } catch (e) { console.error(e); }
@@ -29,9 +35,9 @@ export default function Autorizar() {
   const handleUpdatePresupuesto = async () => {
     const monto = parseFloat(nuevoMonto);
     if (isNaN(monto)) return;
-    await fetch('http://localhost:3000/autorizacion/presupuesto', {
+    await fetch(ENDPOINTS.AUTORIZACION.PRESUPUESTO, {
       method: 'PATCH',
-      headers: { 'Content-Type': 'application/json' },
+      headers: getHeaders(),
       body: JSON.stringify({ monto })
     });
     setNuevoMonto("");
@@ -39,10 +45,11 @@ export default function Autorizar() {
   };
 
   const handleDecision = async (cotId: number) => {
-    // API FUNCIONANDO: Envía ID y Prioridad sin validar saldo localmente
-    await fetch(`http://localhost:3000/autorizacion/${seleccionada.id}/decidir`, {
+    if (!seleccionada) return;
+    // Uso de ENDPOINTS.AUTORIZACION.DECIDIR
+    await fetch(ENDPOINTS.AUTORIZACION.DECIDIR(seleccionada.id), {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: getHeaders(),
       body: JSON.stringify({
         cotizacionId: cotId,
         nuevaPrioridad: colorManual
@@ -53,7 +60,7 @@ export default function Autorizar() {
   };
 
   const todosLosMensajes = pendientes.flatMap(s =>
-    (s.mensajes || []).map((m: any) => ({ ...m, folio: s.folio }))
+    (s.mensajes || []).map((m: MensajeHistorial) => ({ ...m, folio: s.folio }))
   );
 
   return (
@@ -125,7 +132,7 @@ export default function Autorizar() {
             </div>
 
             <div className={styles.cotizacionesGrid}>
-              {seleccionada.cotizaciones?.map((cot: any) => (
+              {seleccionada.cotizaciones?.map((cot: Cotizacion) => (
                 <div key={cot.id} className={styles.cotCard}>
                   <div className={styles.cotHeader}>
                     <span>OPCIÓN PROVEEDOR</span>

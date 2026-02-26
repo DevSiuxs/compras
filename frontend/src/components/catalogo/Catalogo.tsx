@@ -1,9 +1,12 @@
 'use client';
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import styles from './Catalogo.module.css';
+import { ENDPOINTS, getHeaders } from '@/config/apiConfig';
+import { CatalogosData, Empresa, Unidad, Area } from '@/types';
 
 export default function Catalogos() {
-  const [datos, setDatos] = useState({
+  // Uso de interfaz CatalogosData para eliminar 'any'
+  const [datos, setDatos] = useState<CatalogosData>({
     empresas: [],
     unidades: [],
     areas: []
@@ -15,12 +18,13 @@ export default function Catalogos() {
     area: ''
   });
 
-  const cargarDatos = async () => {
+  const cargarDatos = useCallback(async () => {
     try {
+      const headers = getHeaders();
       const [resE, resU, resA] = await Promise.all([
-        fetch('http://localhost:3000/catalogos/empresas'),
-        fetch('http://localhost:3000/catalogos/unidades'),
-        fetch('http://localhost:3000/catalogos/areas')
+        fetch(ENDPOINTS.CATALOGOS.EMPRESAS, { headers }),
+        fetch(ENDPOINTS.CATALOGOS.UNIDADES, { headers }),
+        fetch(ENDPOINTS.CATALOGOS.AREAS, { headers })
       ]);
 
       setDatos({
@@ -31,21 +35,25 @@ export default function Catalogos() {
     } catch (e) {
       console.error("Error cargando catálogos", e);
     }
-  };
+  }, []);
 
-  useEffect(() => { cargarDatos(); }, []);
+  useEffect(() => { cargarDatos(); }, [cargarDatos]);
 
   const handleCrear = async (tipo: 'empresas' | 'unidades' | 'areas', nombre: string) => {
     if (!nombre.trim()) return;
     try {
-      const res = await fetch(`http://localhost:3000/catalogos/${tipo}`, {
+      // Selección dinámica de endpoint
+      const url = tipo === 'empresas' ? ENDPOINTS.CATALOGOS.EMPRESAS
+                : tipo === 'unidades' ? ENDPOINTS.CATALOGOS.UNIDADES
+                : ENDPOINTS.CATALOGOS.AREAS;
+
+      const res = await fetch(url, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: getHeaders(),
         body: JSON.stringify({ nombre })
       });
 
       if (res.ok) {
-        // Mapeo para limpiar el input correcto (ej: 'areas' -> 'area')
         const inputKey = tipo === 'areas' ? 'area' : tipo === 'unidades' ? 'unidad' : 'empresa';
         setInputs({ ...inputs, [inputKey]: '' });
         cargarDatos();
@@ -55,11 +63,19 @@ export default function Catalogos() {
     }
   };
 
-  const handleBorrar = async (tipo: string, id: number) => {
+  const handleBorrar = async (tipo: 'empresas' | 'unidades' | 'areas', id: number) => {
     if (!confirm('¿Eliminar registro?')) return;
     try {
-      await fetch(`http://localhost:3000/catalogos/${tipo}/${id}`, { method: 'DELETE' });
-      cargarDatos();
+      const baseUrl = tipo === 'empresas' ? ENDPOINTS.CATALOGOS.EMPRESAS
+                    : tipo === 'unidades' ? ENDPOINTS.CATALOGOS.UNIDADES
+                    : ENDPOINTS.CATALOGOS.AREAS;
+
+      const res = await fetch(`${baseUrl}/${id}`, {
+        method: 'DELETE',
+        headers: getHeaders()
+      });
+
+      if (res.ok) cargarDatos();
     } catch (e) {
       console.error("Error al borrar:", e);
     }
@@ -85,7 +101,7 @@ export default function Catalogos() {
             <button onClick={() => handleCrear('empresas', inputs.empresa)}>Añadir</button>
           </div>
           <div className={styles.list}>
-            {datos.empresas.map((e: any) => (
+            {datos.empresas.map((e: Empresa) => (
               <div key={e.id} className={styles.item}>
                 <span>{e.nombre}</span>
                 <button onClick={() => handleBorrar('empresas', e.id)}>🗑️</button>
@@ -106,7 +122,7 @@ export default function Catalogos() {
             <button onClick={() => handleCrear('areas', inputs.area)}>Añadir</button>
           </div>
           <div className={styles.list}>
-            {datos.areas.map((a: any) => (
+            {datos.areas.map((a: Area) => (
               <div key={a.id} className={styles.item}>
                 <span>{a.nombre}</span>
                 <button onClick={() => handleBorrar('areas', a.id)}>🗑️</button>
@@ -127,7 +143,7 @@ export default function Catalogos() {
             <button onClick={() => handleCrear('unidades', inputs.unidad)}>Añadir</button>
           </div>
           <div className={styles.list}>
-            {datos.unidades.map((u: any) => (
+            {datos.unidades.map((u: Unidad) => (
               <div key={u.id} className={styles.item}>
                 <span>{u.nombre}</span>
                 <button onClick={() => handleBorrar('unidades', u.id)}>🗑️</button>

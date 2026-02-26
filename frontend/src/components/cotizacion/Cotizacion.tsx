@@ -1,34 +1,46 @@
 'use client';
 import { useState, useEffect } from 'react';
 import styles from './Cotizacion.module.css';
+// Importación corregida basada en tus archivos de tipos
+import { ItemSolicitud, Solicitud,CreateCotizacionesDTO } from '@/types';
+import { ENDPOINTS, getHeaders } from '@/config/apiConfig';
 
 export default function Cotizacion() {
-  const [pendientes, setPendientes] = useState([]);
-  const [seleccionado, setSeleccionado] = useState<any>(null);
+  // Se usa 'Solicitud' que es el tipo real en tu index.ts
+  const [pendientes, setPendientes] = useState<Solicitud[]>([]);
+  const [seleccionado, setSeleccionado] = useState<Solicitud | null>(null);
+  const [loading, setLoading] = useState(false);
 
-  // Estados para Propuesta A
   const [pA, setPA] = useState({ proveedor: '', monto: 0, quien: '', obs: '' });
-  // Estados para Propuesta B
   const [pB, setPB] = useState({ proveedor: '', monto: 0, quien: '', obs: '' });
 
   const cargarPendientes = async () => {
     try {
-      const res = await fetch('http://localhost:3000/cotizacion/pendientes');
-      if (res.ok) setPendientes(await res.json());
+      const res = await fetch(ENDPOINTS.COTIZACION.PENDIENTES, {
+        headers: getHeaders()
+      });
+      if (res.ok) {
+        const data: Solicitud[] = await res.json();
+        setPendientes(data);
+      }
     } catch (error) {
-      console.error("Error al cargar pendientes");
+      console.error("Error al cargar pendientes de cotización", error);
     }
   };
 
-  useEffect(() => { cargarPendientes(); }, []);
+  useEffect(() => {
+    cargarPendientes();
+  }, []);
 
   const handleEnviar = async () => {
-    // Validación de seguridad
+    if (!seleccionado) return;
     if (!pA.proveedor || !pB.proveedor || pA.monto <= 0 || pB.monto <= 0) {
       return alert('⚠️ Ambas propuestas deben tener al menos Proveedor y Monto.');
     }
 
-    const payload = {
+    setLoading(true);
+    // Se usa 'CreateCotizacionesDto' que es el tipo esperado por tu backend
+    const payload: CreateCotizacionesDTO = {
       c1_proveedor: pA.proveedor,
       c1_monto: Number(pA.monto),
       c1_quien: pA.quien,
@@ -36,82 +48,108 @@ export default function Cotizacion() {
       c2_proveedor: pB.proveedor,
       c2_monto: Number(pB.monto),
       c2_quien: pB.quien,
-      c2_observaciones: pB.obs
+      c2_observaciones: pB.obs,
     };
 
-    const res = await fetch(`http://localhost:3000/cotizacion/${seleccionado.id}/registrar`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(payload)
-    });
+    try {
+      const res = await fetch(ENDPOINTS.COTIZACION.REGISTRAR(seleccionado.id), {
+        method: 'POST',
+        headers: getHeaders(),
+        body: JSON.stringify(payload),
+      });
 
-    if (res.ok) {
-      alert('✅ Comparativa registrada. La solicitud ahora está en AZUL y pasó a AUTORIZAR.');
-      setSeleccionado(null);
-      cargarPendientes();
+      if (res.ok) {
+        alert('✅ Cotizaciones registradas correctamente.');
+        setSeleccionado(null);
+        setPA({ proveedor: '', monto: 0, quien: '', obs: '' });
+        setPB({ proveedor: '', monto: 0, quien: '', obs: '' });
+        cargarPendientes();
+      }
+    } catch (error) {
+      console.error(error);
+      alert('❌ Error de conexión.');
+    } finally {
+      setLoading(false);
     }
   };
 
   return (
     <div className={styles.container}>
-      {/* LISTADO IZQUIERDO */}
       <aside className={styles.listSide}>
-        <h2 className="text-[10px] text-gray-500 font-black mb-4 tracking-[2px]">BANDEJA DE COMPRAS</h2>
-        {pendientes.length === 0 && <p className="text-xs text-gray-700">No hay folios pendientes...</p>}
-        {pendientes.map((sol: any) => (
+        <h2 className="text-cyan-400 font-bold mb-4">COTIZACIÓN</h2>
+        {pendientes.map((s) => (
           <div
-            key={sol.id}
-            className={`${styles.solCard} ${seleccionado?.id === sol.id ? styles.solCardActive : ''}`}
-            onClick={() => setSeleccionado(sol)}
+            key={s.id}
+            className={`${styles.solCard} ${seleccionado?.id === s.id ? styles.solCardActive : ''}`}
+            onClick={() => setSeleccionado(s)}
           >
-            <p className="text-[10px] text-[#00ff41] font-mono">{sol.folio}</p>
-            <p className="text-sm font-medium">{sol.items[0]?.descripcion}</p>
+            <div className="flex justify-between items-center">
+              <span className="text-xs font-mono">{s.folio}</span>
+              <span className="text-[9px] bg-yellow-900 text-yellow-200 px-2 py-0.5 rounded">{s.status}</span>
+            </div>
+            <div className="text-xs mt-2 text-gray-400">{s.empresa?.nombre}</div>
           </div>
         ))}
       </aside>
 
-      {/* PANEL DE CAPTURA DERECHO */}
       <main className={styles.formSide}>
         {seleccionado ? (
           <>
             <div className={styles.header}>
-              <h1 className="text-2xl font-bold text-white">{seleccionado.folio}</h1>
-              <p className="text-gray-500 text-xs italic uppercase mt-1">Status Actual: COTIZANDO</p>
+              <h1 className="text-xl font-bold text-white mb-2">SOLICITUD: {seleccionado.folio}</h1>
+              <p className="text-sm text-gray-400 italic">"{seleccionado.justificacion}"</p>
             </div>
 
-            {/* GRID DE LAS 2 PROPUESTAS */}
+            <table className={styles.table}>
+              <thead>
+                <tr>
+                  <th>CANTIDAD</th>
+                  <th>DESCRIPCIÓN</th>
+                </tr>
+              </thead>
+              <tbody>
+                {seleccionado.items?.map((item: ItemSolicitud) => (
+                  <tr key={item.id}>
+                    <td>{item.cantidad} {item.unidad?.nombre}</td>
+                    <td>{item.descripcion}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+
             <div className={styles.gridProps}>
-              {/* PROPUESTA A */}
               <div className={styles.propBox}>
-                <span className="text-[10px] text-[#00ff41] font-bold tracking-widest">PROPUESTA A</span>
-                <div className="mt-4 space-y-3">
-                  <input className={styles.input} placeholder="Proveedor" onChange={e => setPA({...pA, proveedor: e.target.value})} />
-                  <input type="number" className={styles.input} placeholder="Monto Total $" onChange={e => setPA({...pA, monto: Number(e.target.value)})} />
-                  <input className={styles.input} placeholder="¿Quién cotizó?" onChange={e => setPA({...pA, quien: e.target.value})} />
-                  <textarea className={styles.textarea} placeholder="Observaciones / Razón de este proveedor" onChange={e => setPA({...pA, obs: e.target.value})} />
+                <p className="text-[10px] text-cyan-400 mb-4 tracking-tighter">PROPUESTA A</p>
+                <div className="flex flex-col gap-3">
+                  <input className={styles.input} placeholder="Proveedor" value={pA.proveedor} onChange={e => setPA({...pA, proveedor: e.target.value})} />
+                  <input type="number" className={styles.input} placeholder="Monto" value={pA.monto || ''} onChange={e => setPA({...pA, monto: Number(e.target.value)})} />
+                  <input className={styles.input} placeholder="¿Quién cotizó?" value={pA.quien} onChange={e => setPA({...pA, quien: e.target.value})} />
+                  <textarea className={styles.textarea} placeholder="Observaciones" value={pA.obs} onChange={e => setPA({...pA, obs: e.target.value})} />
                 </div>
               </div>
 
-              {/* PROPUESTA B */}
               <div className={styles.propBox}>
-                <span className="text-[10px] text-gray-400 font-bold tracking-widest">PROPUESTA B</span>
-                <div className="mt-4 space-y-3">
-                  <input className={styles.input} placeholder="Proveedor" onChange={e => setPB({...pB, proveedor: e.target.value})} />
-                  <input type="number" className={styles.input} placeholder="Monto Total $" onChange={e => setPB({...pB, monto: Number(e.target.value)})} />
-                  <input className={styles.input} placeholder="¿Quién cotizó?" onChange={e => setPB({...pB, quien: e.target.value})} />
-                  <textarea className={styles.textarea} placeholder="Observaciones / Razón de este proveedor" onChange={e => setPB({...pB, obs: e.target.value})} />
+                <p className="text-[10px] text-gray-500 mb-4 tracking-tighter">PROPUESTA B</p>
+                <div className="flex flex-col gap-3">
+                  <input className={styles.input} placeholder="Proveedor" value={pB.proveedor} onChange={e => setPB({...pB, proveedor: e.target.value})} />
+                  <input type="number" className={styles.input} placeholder="Monto" value={pB.monto || ''} onChange={e => setPB({...pB, monto: Number(e.target.value)})} />
+                  <input className={styles.input} placeholder="¿Quién cotizó?" value={pB.quien} onChange={e => setPB({...pB, quien: e.target.value})} />
+                  <textarea className={styles.textarea} placeholder="Observaciones" value={pB.obs} onChange={e => setPB({...pB, obs: e.target.value})} />
                 </div>
               </div>
             </div>
 
-            <button className={styles.btnSubmit} onClick={handleEnviar}>
-              Registrar y Enviar a Autorización (Reset Color a Azul)
+            <button
+              className={styles.btnSubmit}
+              onClick={handleEnviar}
+              disabled={loading}
+            >
+              {loading ? 'REGISTRANDO...' : 'REGISTRAR Y ENVIAR A AUTORIZACIÓN'}
             </button>
           </>
         ) : (
-          <div className="flex flex-col items-center justify-center h-full opacity-20">
-            <p className="text-4xl">📂</p>
-            <p className="text-xs font-mono mt-4">SELECCIONA UN FOLIO PARA COMPARAR PRECIOS</p>
+          <div className="h-full flex items-center justify-center opacity-30">
+            <p className="text-xs tracking-widest">SELECCIONA UNA SOLICITUD PARA COTIZAR</p>
           </div>
         )}
       </main>

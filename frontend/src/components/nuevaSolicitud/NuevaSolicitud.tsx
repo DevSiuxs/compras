@@ -1,16 +1,16 @@
 'use client';
 import { useState, useEffect } from 'react';
 import styles from './NuevaSolicitud.module.css';
+import { Empresa, Unidad, Area, CreateSolicitudDTO } from '@/types';
+import { ENDPOINTS, getHeaders } from '@/config/apiConfig';
 
-// Definimos una interfaz para los catálogos para que TS no use 'never'
 interface CatalogosState {
-  empresas: any[];
-  unidades: any[];
-  areas: any[];
+  empresas: Empresa[];
+  unidades: Unidad[];
+  areas: Area[];
 }
 
 export default function NuevaSolicitud() {
-  // 1. Corregimos el error asignando el tipo a la interfaz definida arriba
   const [catalogos, setCatalogos] = useState<CatalogosState>({
     empresas: [],
     unidades: [],
@@ -31,24 +31,20 @@ export default function NuevaSolicitud() {
   useEffect(() => {
     const cargarCatalogos = async () => {
       try {
+        const headers = getHeaders();
         const [resE, resU, resA] = await Promise.all([
-          fetch('http://localhost:3000/catalogos/empresas'),
-          fetch('http://localhost:3000/catalogos/unidades'),
-          fetch('http://localhost:3000/catalogos/areas')
+          fetch(ENDPOINTS.CATALOGOS.EMPRESAS, { headers }),
+          fetch(ENDPOINTS.CATALOGOS.UNIDADES, { headers }),
+          fetch(ENDPOINTS.CATALOGOS.AREAS, { headers })
         ]);
 
-        const empresas = resE.ok ? await resE.json() : [];
-        const unidades = resU.ok ? await resU.json() : [];
-        const areas = resA.ok ? await resA.json() : [];
-
-        // Ahora TS aceptará estos datos porque definimos que son any[]
         setCatalogos({
-          empresas: Array.isArray(empresas) ? empresas : [],
-          unidades: Array.isArray(unidades) ? unidades : [],
-          areas: Array.isArray(areas) ? areas : []
+          empresas: resE.ok ? await resE.json() : [],
+          unidades: resU.ok ? await resU.json() : [],
+          areas: resA.ok ? await resA.json() : []
         });
-      } catch (e) {
-        console.error("Error cargando catálogos", e);
+      } catch (error) {
+        console.error("Error al cargar catálogos:", error);
       }
     };
     cargarCatalogos();
@@ -56,37 +52,47 @@ export default function NuevaSolicitud() {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+
+    // Validación de seguridad
     if (!form.idEmpresa || !form.idArea || !form.idUnidad) {
-      alert("Por favor seleccione todos los campos de los catálogos");
+      alert("Por favor, selecciona todos los campos obligatorios.");
       return;
     }
 
     setLoading(true);
 
-    const payload = {
-      idEmpresa: Number(form.idEmpresa),
-      idArea: Number(form.idArea),
-      justificacion: form.justificacion,
-      items: [{
-        descripcion: form.material,
-        cantidad: Number(form.cantidad),
-        idUnidad: Number(form.idUnidad)
-      }]
-    };
-
     try {
-      const res = await fetch('http://localhost:3000/solicitudes', {
+      // 1. Construimos el Payload asegurando el tipado numérico que pide el DTO
+      const payload: CreateSolicitudDTO = {
+        idEmpresa: Number(form.idEmpresa),
+        idArea: Number(form.idArea),
+        justificacion: form.justificacion,
+        items: [{
+          descripcion: form.material,
+          cantidad: Number(form.cantidad),
+          idUnidad: Number(form.idUnidad)
+        }]
+      };
+
+      // 2. Enviamos al endpoint configurado
+      const res = await fetch(ENDPOINTS.SOLICITUDES.CREAR, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: getHeaders(), // Esto incluye Content-Type: application/json
         body: JSON.stringify(payload)
       });
 
       if (res.ok) {
-        alert("✨ Requisición generada exitosamente");
+        alert("✨ Solicitud enviada con éxito");
+        // Limpiamos el formulario
         setForm({ idEmpresa: '', idArea: '', justificacion: '', material: '', cantidad: 1, idUnidad: '' });
+      } else {
+        const errorMsg = await res.json();
+        console.error("Respuesta de error del servidor:", errorMsg);
+        alert(`Error al enviar: ${errorMsg.message || 'Error desconocido'}`);
       }
     } catch (error) {
-      alert("Error de conexión con el servidor");
+      console.error("Error de conexión:", error);
+      alert("No se pudo conectar con el servidor.");
     } finally {
       setLoading(false);
     }
@@ -96,16 +102,12 @@ export default function NuevaSolicitud() {
     <div className={styles.container}>
       <div className={styles.glassCard}>
         <header className={styles.header}>
-          <div className={styles.iconCircle}>📝</div>
-          <div>
-            <h1>Nueva Requisición</h1>
-            <p>Complete el formulario para iniciar el proceso de compra</p>
-          </div>
+          <h1>Nueva Solicitud</h1>
+
         </header>
 
         <form onSubmit={handleSubmit} className={styles.form}>
-          <div className={styles.sectionTitle}>1. Datos de Gestión</div>
-          <div className={styles.row}>
+          <div className={styles.grid}>
             <div className={styles.field}>
               <label>EMPRESA</label>
               <select
@@ -113,12 +115,13 @@ export default function NuevaSolicitud() {
                 value={form.idEmpresa}
                 onChange={e => setForm({...form, idEmpresa: e.target.value})}
               >
-                <option value="">Seleccione Empresa...</option>
-                {catalogos.empresas?.map((e: any) => (
+                <option value="">Seleccione...</option>
+                {catalogos.empresas.map((e) => (
                   <option key={e.id} value={e.id}>{e.nombre}</option>
                 ))}
               </select>
             </div>
+
             <div className={styles.field}>
               <label>ÁREA SOLICITANTE</label>
               <select
@@ -126,27 +129,26 @@ export default function NuevaSolicitud() {
                 value={form.idArea}
                 onChange={e => setForm({...form, idArea: e.target.value})}
               >
-                <option value="">Seleccione Área...</option>
-                {catalogos.areas?.map((a: any) => (
+                <option value="">Seleccione...</option>
+                {catalogos.areas.map((a) => (
                   <option key={a.id} value={a.id}>{a.nombre}</option>
                 ))}
               </select>
             </div>
           </div>
 
-          <div className={styles.sectionTitle}>2. Especificaciones</div>
           <div className={styles.field}>
-            <label>MATERIAL / SERVICIO</label>
+            <label>DESCRIPCIÓN DEL MATERIAL</label>
             <input
               required
               type="text"
-              placeholder="Describa el artículo solicitado..."
+              placeholder="¿Qué necesita?"
               value={form.material}
               onChange={e => setForm({...form, material: e.target.value})}
             />
           </div>
 
-          <div className={styles.row}>
+          <div className={styles.grid}>
             <div className={styles.field}>
               <label>CANTIDAD</label>
               <input
@@ -157,6 +159,7 @@ export default function NuevaSolicitud() {
                 onChange={e => setForm({...form, cantidad: Number(e.target.value)})}
               />
             </div>
+
             <div className={styles.field}>
               <label>UNIDAD DE MEDIDA</label>
               <select
@@ -165,26 +168,25 @@ export default function NuevaSolicitud() {
                 onChange={e => setForm({...form, idUnidad: e.target.value})}
               >
                 <option value="">Seleccione...</option>
-                {catalogos.unidades?.map((u: any) => (
+                {catalogos.unidades.map((u) => (
                   <option key={u.id} value={u.id}>{u.nombre}</option>
                 ))}
               </select>
             </div>
           </div>
 
-          <div className={styles.sectionTitle}>3. Justificación Operativa</div>
           <div className={styles.field}>
-            <label>MOTIVO DE LA SOLICITUD</label>
+            <label>JUSTIFICACIÓN</label>
             <textarea
               required
-              placeholder="Indique el proyecto o necesidad técnica..."
+              placeholder="Indique el motivo de la compra"
               value={form.justificacion}
               onChange={e => setForm({...form, justificacion: e.target.value})}
             />
           </div>
 
           <button type="submit" className={styles.submitBtn} disabled={loading}>
-            {loading ? 'ENVIANDO...' : 'ENVIAR SOLICITUD'}
+            {loading ? 'PROCESANDO...' : 'GENERAR SOLICITUD'}
           </button>
         </form>
       </div>

@@ -5,17 +5,44 @@ import {
   ResponsiveContainer, Cell
 } from 'recharts';
 import styles from './Dashboard.module.css';
+import { ENDPOINTS, getHeaders } from '@/config/apiConfig';
+// Importamos la interfaz extendida si tu endpoint devuelve graficoGastos,
+// o puedes ajustarlo si está dentro de DashboardData
+import { DashboardData } from '@/types';
 
 interface DashboardProps { alVerHistorial?: () => void; }
 
+// Interfaz para el objeto de las secciones
+interface SeccionesStatus {
+  [key: string]: number;
+}
+
+// Interfaz para el gráfico
+interface GraficoGasto {
+  name: string;
+  gasto: number;
+}
+
+// Interfaz extendida localmente por los datos que usas en este componente
+interface DashboardResponse extends DashboardData {
+  graficoGastos?: GraficoGasto[];
+}
+
 export default function Dashboard({ alVerHistorial }: DashboardProps) {
-  const [data, setData] = useState<any>(null);
+  // 1. Reemplazamos 'any' por la interfaz correspondiente
+  const [data, setData] = useState<DashboardResponse | null>(null);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    fetch('http://localhost:3000/reportes/dashboard')
-      .then(res => res.json())
-      .then(d => {
+    // 2. Usamos el ENDPOINT y enviamos el Token de privilegios
+    fetch(ENDPOINTS.REPORTES.DASHBOARD, {
+      headers: getHeaders()
+    })
+      .then(res => {
+        if (!res.ok) throw new Error('Error en la petición');
+        return res.json();
+      })
+      .then((d: DashboardResponse) => {
         setData(d);
         setLoading(false);
       })
@@ -30,11 +57,11 @@ export default function Dashboard({ alVerHistorial }: DashboardProps) {
   // --- VARIABLES DE SEGURIDAD (Si data es null o faltan campos) ---
   const presupuesto = data?.presupuestoRestante ?? 0;
   const gasto = data?.gastoTotal ?? 0;
-  const totalSolicitudes = data?.totalTickets ?? 0;
-  const secciones = data?.conteoSecciones ?? {
+  // Eliminada la variable totalSolicitudes porque marcaba warning al no usarse en el JSX
+  const secciones: SeccionesStatus = data?.conteoSecciones ?? {
     ALMACEN: 0, COTIZANDO: 0, AUTORIZAR: 0, COMPRAS: 0, RECEPCION: 0, FINALIZADO: 0
   };
-  const grafico = data?.graficoGastos ?? [];
+  const grafico: GraficoGasto[] = data?.graficoGastos ?? [];
 
   const presupuestoTotal = presupuesto + gasto;
   const porcentajeGastado = presupuestoTotal > 0
@@ -67,7 +94,8 @@ export default function Dashboard({ alVerHistorial }: DashboardProps) {
 
       {/* ESTADO DEL FLUJO */}
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(140px, 1fr))', gap: '1rem' }}>
-        {Object.entries(secciones).map(([key, val]: any) => (
+        {/* Eliminamos el 'any' tipando el Object.entries */}
+        {Object.entries(secciones).map(([key, val]: [string, number]) => (
           <div key={key} className={styles.miniCard} style={{ textAlign: 'center', border: val > 0 ? '1px solid #0070f3' : '1px solid #1a1a1a' }}>
             <span style={{ fontSize: '10px', color: '#444' }}>{key}</span>
             <div style={{ fontSize: '22px', fontWeight: 'bold', color: val > 0 ? '#0070f3' : '#333' }}>{val}</div>
@@ -86,7 +114,8 @@ export default function Dashboard({ alVerHistorial }: DashboardProps) {
               <YAxis stroke="#444" fontSize={10} />
               <Tooltip contentStyle={{ background: '#000', border: '1px solid #222' }} />
               <Bar dataKey="gasto" radius={[5, 5, 0, 0]}>
-                {grafico.map((_: any, index: number) => (
+                {/* Reemplazamos 'any' por GraficoGasto en el map */}
+                {grafico.map((_item: GraficoGasto, index: number) => (
                   <Cell key={`cell-${index}`} fill={index % 2 === 0 ? '#0070f3' : '#7928ca'} />
                 ))}
               </Bar>

@@ -1,17 +1,34 @@
 'use client';
 import { useState, useEffect, useMemo } from 'react';
 import styles from '../Dashboard.module.css';
+import { ENDPOINTS, getHeaders } from '@/config/apiConfig';
+import { Solicitud, TimelineEntry } from '@/types';
+
+// Definimos interfaces específicas para las respuestas de este módulo
+interface DashboardReportResponse {
+  solicitudes?: Solicitud[];
+  recientes?: Solicitud[];
+}
+
+interface TrazabilidadResponse {
+  folio: string;
+  empresa?: {
+    nombre: string;
+  };
+  timeline: TimelineEntry[];
+}
 
 export default function HistorialGeneral() {
-  const [solicitudes, setSolicitudes] = useState<any[]>([]);
-  const [detallada, setDetallada] = useState<any>(null);
-  const [loading, setLoading] = useState(true);
+  const [solicitudes, setSolicitudes] = useState<Solicitud[]>([]);
+  const [detallada, setDetallada] = useState<TrazabilidadResponse | null>(null);
+  const [loading, setLoading] = useState<boolean>(true);
 
   // ESTADOS PARA LOS FILTROS
-  const [filtroFecha, setFiltroFecha] = useState('');
-  const [filtroFolio, setFiltroFolio] = useState(''); // Filtro por número de folio
+  const [filtroFecha, setFiltroFecha] = useState<string>('');
+  const [filtroFolio, setFiltroFolio] = useState<string>('');
 
-  const STATUS_COLORS: any = {
+  // Tipado estricto para el mapeo de colores por estado
+  const STATUS_COLORS: Record<string, string> = {
     SOLICITADO: '#0070f3',
     COTIZANDO: '#7928ca',
     AUTORIZAR: '#ffca28',
@@ -22,32 +39,41 @@ export default function HistorialGeneral() {
   };
 
   useEffect(() => {
-    // Llamamos al endpoint. IMPORTANTE: El service debe devolver 'solicitudes' o 'recientes'
-    fetch('http://localhost:3000/reportes/dashboard')
-      .then(res => res.json())
-      .then(data => {
-        // Ajuste de seguridad para encontrar la lista de solicitudes
+    // Usamos ENDPOINTS y enviamos el Token de privilegios
+    fetch(ENDPOINTS.REPORTES.DASHBOARD, {
+      headers: getHeaders()
+    })
+      .then(res => {
+        if (!res.ok) throw new Error('Error al obtener el historial');
+        return res.json();
+      })
+      .then((data: DashboardReportResponse) => {
         const lista = data.solicitudes || data.recientes || [];
         setSolicitudes(lista);
         setLoading(false);
       })
       .catch(err => {
-        console.error("Error:", err);
+        console.error("Error cargando historial:", err);
         setLoading(false);
       });
   }, []);
 
   const verTrazabilidad = (id: number) => {
-    fetch(`http://localhost:3000/reportes/detalle/${id}`)
-      .then(res => res.json())
-      .then(d => setDetallada(d));
+    fetch(ENDPOINTS.REPORTES.TRAZABILIDAD(id), {
+      headers: getHeaders()
+    })
+      .then(res => {
+        if (!res.ok) throw new Error('Error al obtener trazabilidad');
+        return res.json();
+      })
+      .then((d: TrazabilidadResponse) => setDetallada(d))
+      .catch(err => console.error("Error en detalle:", err));
   };
 
   // LÓGICA DE FILTRADO: Por fecha y por Número de Folio
   const solicitudesFiltradas = useMemo(() => {
-    return solicitudes.filter((s: any) => {
+    return solicitudes.filter((s: Solicitud) => {
       const coincideFecha = filtroFecha ? s.fechaCreacion.includes(filtroFecha) : true;
-      // Filtra si el folio contiene el número que escribas (ej: "001")
       const coincideFolio = filtroFolio ? s.folio.toLowerCase().includes(filtroFolio.toLowerCase()) : true;
       return coincideFecha && coincideFolio;
     });
@@ -101,7 +127,7 @@ export default function HistorialGeneral() {
           </thead>
           <tbody>
             {solicitudesFiltradas.length > 0 ? (
-              solicitudesFiltradas.map((sol: any) => (
+              solicitudesFiltradas.map((sol: Solicitud) => (
                 <tr key={sol.id} className={styles.row}>
                   <td className={styles.folio} style={{ fontWeight: 'bold', color: '#0070f3' }}>{sol.folio}</td>
                   <td>{sol.empresa?.nombre || 'N/A'}</td>
@@ -149,7 +175,7 @@ export default function HistorialGeneral() {
             <p style={{ marginBottom: '2rem' }}>{detallada.folio} | {detallada.empresa?.nombre}</p>
 
             <div className={styles.timeline}>
-              {detallada.timeline?.map((t: any, i: number) => (
+              {detallada.timeline?.map((t: TimelineEntry, i: number) => (
                 <div key={i} className={styles.timeEntry}>
                   <div className={styles.timeDot} style={{ background: t.color }}></div>
                   <div className={styles.timeBody}>

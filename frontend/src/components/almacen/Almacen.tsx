@@ -1,26 +1,31 @@
 'use client';
 import { useState, useEffect } from 'react';
 import styles from './Almacen.module.css';
+import { ENDPOINTS, getHeaders } from '@/config/apiConfig'; // Importación correcta
 
 export default function Almacen() {
   const [pendientes, setPendientes] = useState<any[]>([]);
   const [filtroFecha, setFiltroFecha] = useState('');
   const [seleccionada, setSeleccionada] = useState<any>(null);
+  const [loading, setLoading] = useState(false);
   const [form, setForm] = useState({ nombre: '', apellidoPaterno: '', apellidoMaterno: '' });
 
   const cargarPendientes = async () => {
     try {
-      const res = await fetch('http://localhost:3000/almacen/pendientes');
+      const res = await fetch(ENDPOINTS.ALMACEN.PENDIENTES, {
+        headers: getHeaders()
+      });
       if (res.ok) {
         const data = await res.json();
         setPendientes(data);
       }
-    } catch (e) { console.error(e); }
+    } catch (e) {
+      console.error("Error cargando pendientes de almacén", e);
+    }
   };
 
   useEffect(() => { cargarPendientes(); }, []);
 
-  // Función para filtrar por fecha en el frontend
   const solicitudesFiltradas = pendientes.filter(s => {
     if (!filtroFecha) return true;
     const fechaSol = new Date(s.fechaCreacion).toISOString().split('T')[0];
@@ -28,78 +33,75 @@ export default function Almacen() {
   });
 
   const handleDecision = async (id: number, decision: 'surtir' | 'no-stock') => {
-    if (decision === 'no-stock') {
-      await fetch(`http://localhost:3000/almacen/${id}/procesar`, {
+    setLoading(true);
+    try {
+      const res = await fetch(ENDPOINTS.ALMACEN.PROCESAR(id), {
         method: 'PATCH',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ decision: 'no-stock' })
+        headers: getHeaders(),
+        body: JSON.stringify({ decision })
       });
-      setSeleccionada(null);
-      cargarPendientes();
+
+      if (res.ok) {
+        alert(decision === 'surtir' ? "¡Material surtido!" : "Enviado a cotización");
+        setSeleccionada(null);
+        cargarPendientes(); // Recargar lista
+      }
+    } catch (e) {
+      console.error(e);
+      alert("Error al procesar la solicitud");
+    } finally {
+      setLoading(false);
     }
   };
 
-  const finalizarSurtido = async () => {
-    if (!seleccionada) return; // Seguridad contra el error de null
-    const res = await fetch(`http://localhost:3000/recepcion/${seleccionada.id}/entregar`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(form)
-    });
-    if (res.ok) {
-      alert("✅ Surtido finalizado con éxito.");
-      setSeleccionada(null);
-      cargarPendientes();
+  const finalizarSurtido = () => {
+    if(!form.nombre || !form.apellidoPaterno) {
+      alert("Por favor, ingresa quién recibe el material");
+      return;
     }
+    handleDecision(seleccionada.id, 'surtir');
   };
 
   return (
     <div className={styles.container}>
-      {/* PANEL IZQUIERDO: NUEVAS SOLICITUDES */}
       <aside className={styles.sidebar}>
         <div className={styles.headerSidebar}>
-          <h2 className={styles.azulClaro}>SOLICITUDES</h2>
-          <p className={styles.subtext}>POR REVISAR</p>
+          <h2 className={styles.azulClaro}>ALMACÉN</h2>
+          <p className={styles.subtext}>PENDIENTES DE SURTIDO</p>
+          <input
+            type="date"
+            className={styles.dateFilter}
+            value={filtroFecha}
+            onChange={(e) => setFiltroFecha(e.target.value)}
+          />
         </div>
         <div className={styles.scrollArea}>
-          {solicitudesFiltradas.map((sol: any) => (
+          {solicitudesFiltradas.map((s) => (
             <div
-              key={sol.id}
-              className={`${styles.cardSolicitud} ${seleccionada?.id === sol.id ? styles.cardActive : ''}`}
-              onClick={() => setSeleccionada(sol)}
+              key={s.id}
+              className={`${styles.cardSolicitud} ${seleccionada?.id === s.id ? styles.activeCard : ''}`}
+              onClick={() => setSeleccionada(s)}
             >
-              <span className={styles.folio}>{sol.folio}</span>
-              <h4>{sol.area?.nombre || 'Sin Área'}</h4>
-              <p className={styles.fechaCard}>{new Date(sol.fechaCreacion).toLocaleDateString()}</p>
+              <div className={styles.folioRow}>
+                <span className={styles.folio}>{s.folio}</span>
+                <span className={styles.statusBadge}>{s.status}</span>
+              </div>
+              <div className={styles.empresaName}>{s.empresa?.nombre}</div>
             </div>
           ))}
-          {solicitudesFiltradas.length === 0 && <p className={styles.emptyMsg}>No hay peticiones</p>}
         </div>
       </aside>
 
-      {/* PANEL DERECHO: FILTRADO Y ACCIONES */}
-      <main className={styles.mainPanel}>
-        <div className={styles.topBar}>
-          <div className={styles.filterGroup}>
-            <label>FILTRAR POR FECHA RECIBIDA:</label>
-            <input type="date" value={filtroFecha} onChange={(e) => setFiltroFecha(e.target.value)} />
-          </div>
-          <h3 className={styles.azulClaro}>GESTIÓN DE STOCK</h3>
-        </div>
-
+      <main className={styles.mainContent}>
         {seleccionada ? (
           <div className={styles.detalleContainer}>
-            <div className={styles.headerDetalle}>
-              <h1>FOLIO: {seleccionada.folio}</h1>
-              <p>{seleccionada.empresa?.nombre}</p>
-            </div>
-
             <div className={styles.infoBox}>
-              <p><strong>Justificación:</strong> {seleccionada.justificacion}</p>
+              <h1 className={styles.azulClaro}>DETALLE DE SOLICITUD</h1>
+              <p><strong>JUSTIFICACIÓN:</strong> {seleccionada.justificacion}</p>
               <div className={styles.itemsList}>
-                {seleccionada.items?.map((item: any, i: number) => (
-                  <div key={i} className={styles.itemRow}>
-                    • {item.cantidad} {item.unidad?.nombre} - {item.descripcion}
+                {seleccionada.items?.map((item: any) => (
+                  <div key={item.id} className={styles.itemRow}>
+                    📦 {item.cantidad} {item.unidad?.nombre} - {item.descripcion}
                   </div>
                 ))}
               </div>
@@ -108,17 +110,39 @@ export default function Almacen() {
             <div className={styles.actionsGrid}>
               <div className={styles.formEntrega}>
                 <h3 className={styles.azulClaro}>SI HAY STOCK - REGISTRAR ENTREGA</h3>
-                <input placeholder="Nombre de quien recibe" onChange={e => setForm({...form, nombre: e.target.value})} />
+                <input
+                  placeholder="Nombre de quien recibe"
+                  value={form.nombre}
+                  onChange={e => setForm({...form, nombre: e.target.value})}
+                />
                 <div className={styles.rowInputs}>
-                  <input placeholder="A. Paterno" onChange={e => setForm({...form, apellidoPaterno: e.target.value})} />
-                  <input placeholder="A. Materno" onChange={e => setForm({...form, apellidoMaterno: e.target.value})} />
+                  <input
+                    placeholder="A. Paterno"
+                    value={form.apellidoPaterno}
+                    onChange={e => setForm({...form, apellidoPaterno: e.target.value})}
+                  />
+                  <input
+                    placeholder="A. Materno"
+                    value={form.apellidoMaterno}
+                    onChange={e => setForm({...form, apellidoMaterno: e.target.value})}
+                  />
                 </div>
-                <button className={styles.btnSurtir} onClick={finalizarSurtido}>SURTIR Y FINALIZAR</button>
+                <button
+                  className={styles.btnSurtir}
+                  onClick={finalizarSurtido}
+                  disabled={loading}
+                >
+                  {loading ? 'PROCESANDO...' : 'SURTIR Y FINALIZAR'}
+                </button>
               </div>
 
               <div className={styles.noStockZone}>
                 <p>¿No cuentas con el material?</p>
-                <button className={styles.btnNoStock} onClick={() => handleDecision(seleccionada.id, 'no-stock')}>
+                <button
+                  className={styles.btnNoStock}
+                  onClick={() => handleDecision(seleccionada.id, 'no-stock')}
+                  disabled={loading}
+                >
                   ENVIAR A COTIZACIÓN
                 </button>
               </div>

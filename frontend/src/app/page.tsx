@@ -9,7 +9,7 @@ import Cotizacion from "@/components/cotizacion/Cotizacion";
 import Autorizar from "@/components/autorizacion/Autorizacion";
 import Comprar from "@/components/compras/comprar";
 import Dashboard from "@/components/dashboard/Dashboard";
-import Recepcion from "@/components/recepcion/recepcion";
+import Recepcion from "@/components/recepcion/Recepcion";
 // IMPORTA TU NUEVO COMPONENTE
 import HistorialGeneral from "@/components/dashboard/historial/HistorialGeneral";
 
