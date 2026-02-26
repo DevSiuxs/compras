@@ -1,35 +1,81 @@
-.container { width: 100%; }
-.neonText { color: #00d4ff; text-shadow: 0 0 10px rgba(0, 212, 255, 0.5); font-weight: bold; margin-bottom: 20px; }
+.container {
+  display: flex;
+  height: calc(100vh - 80px);
+  background: #050505;
+}
 
-.solCard {
+.azulClaro { color: #00d2ff; }
+
+.sidebar {
+  width: 320px;
+  background: #0a0a0a;
+  border-right: 1px solid #151515;
+  padding: 1.5rem;
+}
+
+.main {
+  flex: 1;
+  padding: 3rem;
+  background: radial-gradient(circle at top right, #0d1a20 0%, #050505 100%);
+}
+
+.card {
   background: #111;
-  padding: 15px;
-  margin-bottom: 8px;
+  padding: 1.2rem;
+  border-radius: 8px;
+  margin-bottom: 0.8rem;
+  border: 1px solid #222;
   cursor: pointer;
-  border-right: 4px solid #333;
   transition: 0.3s;
 }
 
-.solCard.active { border-color: #00ff41; background: #0a1a0a; }
+.cardActive { border-color: #00d2ff; background: #0d1a20; }
 
-.glassForm {
-  background: rgba(15, 15, 15, 0.9);
-  padding: 2rem;
-  border: 1px solid #00ff41;
+.formulario {
+  max-width: 600px;
+  background: rgba(15, 15, 15, 0.8);
+  padding: 3rem;
+  border-radius: 20px;
+  border: 1px solid #1a1a1a;
+  backdrop-filter: blur(10px);
+}
+
+.gridForm {
+  display: grid;
+  gap: 1.5rem;
+  margin: 2rem 0;
+}
+
+.field label {
+  display: block;
+  font-size: 12px;
+  color: #555;
+  margin-bottom: 8px;
+  text-transform: uppercase;
+}
+
+.field input {
+  width: 100%;
+  background: #000;
+  border: 1px solid #333;
+  padding: 1rem;
+  color: #fff;
   border-radius: 8px;
+  outline: none;
 }
 
-.input {
-  width: 100%; background: #000; border: 1px solid #333;
-  color: #fff; padding: 12px; border-radius: 4px; outline: none;
+.field input:focus { border-color: #00d2ff; }
+
+.btnAceptar {
+  background: #00d2ff;
+  color: #000;
+  width: 100%;
+  padding: 1.2rem;
+  border: none;
+  border-radius: 8px;
+  font-weight: 900;
+  cursor: pointer;
+  transition: 0.3s;
 }
 
-.input:focus { border-color: #00d4ff; }
-
-.infoBox { background: #000; padding: 10px; border: 1px dashed #333; margin: 10px 0; }
-
-.btnFinalizar {
-  width: 100%; padding: 15px; background: #00ff41;
-  color: #000; font-weight: bold; border: none; border-radius: 4px;
-  cursor: pointer; text-transform: uppercase;
-}
+.btnAceptar:hover { box-shadow: 0 0 20px rgba(0, 210, 255, 0.4); }

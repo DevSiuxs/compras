@@ -21,6 +21,12 @@ model Empresa {
   solicitudes Solicitud[]
 }
 
+model Area {
+  id          Int         @id @default(autoincrement())
+  nombre      String      @unique
+  solicitudes Solicitud[]
+}
+
 // --- 2. PRESUPUESTO GLOBAL ---
 
 model ConfiguracionGlobal {
@@ -34,31 +40,30 @@ model Solicitud {
   id               Int      @id @default(autoincrement())
   folio            String   @unique
   fechaCreacion    DateTime @default(now())
-
-  // Para control del semáforo
   fechaResetColor  DateTime @default(now())
-
-  // FECHA DE CIERRE: Vital para el Dashboard (saber en qué mes se gastó)
   fechaFinalizado  DateTime?
-
   justificacion    String   @db.Text
-  area             String
 
-  // Status: SOLICITADO, ALMACEN, COTIZANDO, AUTORIZAR, COMPRAR, PAGADO, RECHAZADO
+  // 1. ELIMINAMOS 'area String' para evitar el error P1012
+
   status           String   @default("SOLICITADO")
-
-  // Prioridad (Colores): AZUL, VERDE, AMARILLO, NARANJA, ROJO
   prioridad        String   @default("AZUL")
+  montoFinal       Float?
+  proveedorFinal   String?
+  compradorId      Int?
 
-  // --- DATOS DE CONSOLIDACIÓN (Para el Dashboard) ---
-  // Guardamos esto aquí para no tener que buscar siempre en la tabla de cotizaciones
-  montoFinal       Float?    // El total exacto que se pagó
-  proveedorFinal   String?   // El proveedor que ganó la licitación
-  compradorId      Int?      // Quién ejecutó la compra final
-
-  // Relación con Empresa
   idEmpresa        Int
   empresa          Empresa  @relation(fields: [idEmpresa], references: [id])
+
+  // 2. LA RELACIÓN SE QUEDA ASÍ (Asegúrate de que el nombre sea 'area')
+  idArea           Int
+  area             Area     @relation(fields: [idArea], references: [id])
+  
+  //3 proceso final de compras a recepcion
+  nombreRecibe     String?
+  apellidoPRecibe  String?
+  apellidoMRecibe  String?
+  fechaRecepcion   DateTime?
 
   items            ItemSolicitud[]
   cotizaciones     Cotizacion[]

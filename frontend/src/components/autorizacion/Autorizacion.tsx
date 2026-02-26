@@ -26,180 +26,149 @@ export default function Autorizar() {
 
   useEffect(() => { cargarDatos(); }, []);
 
-  // --- LÓGICA DE MENSAJES ---
-  const todosLosMensajes = pendientes.flatMap(sol =>
-    (sol.mensajes || []).map((m: any) => ({ ...m, folio: sol.folio, solCompleta: sol }))
-  );
-
-  const noLeidos = todosLosMensajes.filter(m => !m.leido).length;
-  const leidos = todosLosMensajes.filter(m => m.leido).length;
-
-  const handleDecision = async (cotId: number, monto: number) => {
-    if (monto > presupuesto) return alert("⚠️ Saldo Insuficiente");
-    const res = await fetch(`http://localhost:3000/autorizacion/${seleccionada.id}/decidir`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ cotizacionId: cotId, nuevaPrioridad: colorManual, resetColor: true })
-    });
-    if (res.ok) {
-      alert("✅ Solicitud Enviada a Compras");
-      setSeleccionada(null);
-      cargarDatos();
-    }
-  };
-
-  const actualizarPresupuesto = async () => {
-    const res = await fetch('http://localhost:3000/autorizacion/presupuesto', {
+  const handleUpdatePresupuesto = async () => {
+    const monto = parseFloat(nuevoMonto);
+    if (isNaN(monto)) return;
+    await fetch('http://localhost:3000/autorizacion/presupuesto', {
       method: 'PATCH',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ monto: Number(nuevoMonto) })
+      body: JSON.stringify({ monto })
     });
-    if (res.ok) {
-      alert("💰 Presupuesto Actualizado");
-      setNuevoMonto("");
-      cargarDatos();
-    }
+    setNuevoMonto("");
+    cargarDatos();
   };
 
-  const handleToggleMsjs = () => {
-    const abriendo = !showMsjs;
-    setShowMsjs(abriendo);
-    // Marcamos como leídos localmente al cerrar para limpiar la campana
-    if (!abriendo) {
-       setPendientes(prev => prev.map(sol => ({
-        ...sol,
-        mensajes: sol.mensajes?.map((m: any) => ({ ...m, leido: true }))
-      })));
-    }
+  const handleDecision = async (cotId: number) => {
+    // API FUNCIONANDO: Envía ID y Prioridad sin validar saldo localmente
+    await fetch(`http://localhost:3000/autorizacion/${seleccionada.id}/decidir`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        cotizacionId: cotId,
+        nuevaPrioridad: colorManual
+      })
+    });
+    setSeleccionada(null);
+    cargarDatos();
   };
+
+  const todosLosMensajes = pendientes.flatMap(s =>
+    (s.mensajes || []).map((m: any) => ({ ...m, folio: s.folio }))
+  );
 
   return (
     <div className={styles.container}>
       <aside className={styles.sidebar}>
         <div className={styles.sidebarHeader}>
-          <h2>PENDIENTES</h2>
+          <h2>SOLICITUDES</h2>
           <div className={styles.notifWrapper}>
-            <button className={styles.bellBtn} onClick={handleToggleMsjs}>
-              🔔 {noLeidos > 0 && <span className={styles.badgeCount}>{noLeidos}</span>}
+            <button className={styles.bellBtn} onClick={() => setShowMsjs(true)}>
+              🔔 {todosLosMensajes.length > 0 && <span className={styles.badge}>{todosLosMensajes.length}</span>}
             </button>
-            {showMsjs && (
-              <div className={styles.msgDropdown}>
-                <div className={styles.msgStats}>
-                  <span className={styles.statNew}>Nuevos: {noLeidos}</span>
-                  <span className={styles.statOld}>Leídos: {leidos}</span>
-                </div>
-                <div className={styles.msgScroll}>
-                  {todosLosMensajes.length === 0 ? (
-                    <p className={styles.emptyMsg}>Sin mensajes</p>
-                  ) : (
-                    todosLosMensajes.map((m: any, idx: number) => (
-                      <div
-                        key={idx}
-                        className={`${styles.msgItem} ${!m.leido ? styles.unread : styles.read}`}
-                        onClick={() => { setSeleccionada(m.solCompleta); setShowMsjs(false); }}
-                      >
-                        <span className={styles.msgFolio}>{m.folio}</span>
-                        <p>{m.motivo}</p>
-                      </div>
-                    ))
-                  )}
-                </div>
-              </div>
-            )}
           </div>
         </div>
 
-        <div className={styles.solList}>
+        <div className={styles.scrollArea}>
           {pendientes.map(sol => (
             <div
               key={sol.id}
-              className={`${styles.solCard} ${seleccionada?.id === sol.id ? styles.active : ''}`}
-              onClick={() => setSeleccionada(sol)}
+              className={`${styles.solCard} ${seleccionada?.id === sol.id ? styles.activeCard : ''}`}
+              onClick={() => {
+                setSeleccionada(sol);
+                setColorManual(sol.prioridad || "AZUL");
+              }}
             >
-              <div className={styles.cardInfo}>
-                <span className={styles.folioText}>{sol.folio}</span>
-                <span className={styles.empresaText}>{sol.empresa?.nombre}</span>
+              <div className={styles.cardHeader}>
+                <span className={styles.folio}>#{sol.folio}</span>
+                <div className={styles.statusDot} style={{ background: `var(--${sol.prioridad?.toLowerCase() || 'azul'})` }} />
               </div>
-              {sol.mensajes?.some((m: any) => !m.leido) && <span className={styles.blueDot}></span>}
+              <p className={styles.empresaName}>{sol.empresa?.nombre}</p>
             </div>
           ))}
         </div>
       </aside>
 
-      <main className={styles.main}>
+      <main className={styles.mainContent}>
+        <header className={styles.topBar}>
+          <div className={styles.budgetDisplay}>
+            <p className={styles.label}>PRESUPUESTO DISPONIBLE</p>
+            <h1>${presupuesto.toLocaleString()}</h1>
+          </div>
+          <div className={styles.budgetActions}>
+            <input
+              type="number"
+              className={styles.montoInput}
+              placeholder="Monto..."
+              value={nuevoMonto}
+              onChange={(e) => setNuevoMonto(e.target.value)}
+            />
+            <button className={styles.btnActualizar} onClick={handleUpdatePresupuesto}>ACTUALIZAR</button>
+          </div>
+        </header>
+
         {seleccionada ? (
-          <div className={styles.contentArea}>
-            <header className={styles.header}>
-              <div className={styles.headerTitle}>
-                <h1>Folio: {seleccionada.folio}</h1>
-                <p>{seleccionada.empresa?.nombre} | {seleccionada.area}</p>
-              </div>
-              <div className={styles.budgetControl}>
-                <p>SALDO GLOBAL: <span>${presupuesto.toLocaleString()}</span></p>
-                <div className={styles.inputGroup}>
-                  <input
-                    type="number"
-                    value={nuevoMonto}
-                    onChange={(e) => setNuevoMonto(e.target.value)}
-                    placeholder="Ajustar..."
-                  />
-                  <button onClick={actualizarPresupuesto}>AJUSTAR</button>
+          <div className={styles.detailsView}>
+            <div className={styles.detailHeader}>
+              <div>
+                <span className={styles.label}>ESTABLECER SEMÁFORO</span>
+                <div className={styles.colorOptions}>
+                  {colores.map(c => (
+                    <button
+                      key={c}
+                      className={`${styles.colorBtn} ${colorManual === c ? styles.colorActive : ''}`}
+                      style={{ background: `var(--${c.toLowerCase()})` }}
+                      onClick={() => setColorManual(c)}
+                    />
+                  ))}
                 </div>
               </div>
-            </header>
-
-            <section className={styles.itemsSection}>
-              <h3 className={styles.sectionTitle}>CONCEPTOS DE LA SOLICITUD</h3>
-              <div className={styles.itemsGrid}>
-                {seleccionada.items?.map((it: any) => (
-                  <div key={it.id} className={styles.itemCard}>
-                    <span className={styles.itemQty}>{it.cantidad} {it.unidad?.nombre || 'PZ'}</span>
-                    <p className={styles.itemDesc}>{it.descripcion}</p>
-                  </div>
-                ))}
-              </div>
-            </section>
-
-            <section className={styles.colorSelector}>
-              <span className={styles.label}>SELECCIONAR PRIORIDAD:</span>
-              <div className={styles.colorOptions}>
-                {colores.map(c => (
-                  <button
-                    key={c}
-                    className={`${styles.colorBtn} ${colorManual === c ? styles.colorActive : ''}`}
-                    style={{ background: `var(--${c.toLowerCase()})` }}
-                    onClick={() => setColorManual(c)}
-                  />
-                ))}
-              </div>
-            </section>
+            </div>
 
             <div className={styles.cotizacionesGrid}>
               {seleccionada.cotizaciones?.map((cot: any) => (
-                <div key={cot.id} className={`${styles.cotCard} ${cot.monto > presupuesto ? styles.locked : ''}`}>
+                <div key={cot.id} className={styles.cotCard}>
                   <div className={styles.cotHeader}>
-                    <span>PROVEEDOR: {cot.proveedor}</span>
-                    <p className={styles.monto}>${cot.monto.toLocaleString()}</p>
+                    <span>OPCIÓN PROVEEDOR</span>
+                    <h2 className={styles.monto}>${cot.monto.toLocaleString()}</h2>
+                    <p className={styles.provName}>{cot.proveedor}</p>
                   </div>
                   <div className={styles.cotBody}>
-                    <p><strong>Cotizó:</strong> {cot.quienCotizo}</p>
-                    <p><strong>Notas:</strong> {cot.observaciones || "Sin observaciones"}</p>
+                     <p className={styles.obs}>{cot.observaciones || "Sin observaciones adicionales"}</p>
                   </div>
-                  <button
-                    disabled={cot.monto > presupuesto}
-                    onClick={() => handleDecision(cot.id, cot.monto)}
-                    className={styles.mainAction}
-                  >
-                    {cot.monto > presupuesto ? "BLOQUEADO POR SALDO" : `AUTORIZAR`}
+                  <button onClick={() => handleDecision(cot.id)} className={styles.mainAction}>
+                    {cot.monto > presupuesto ? "AUTORIZAR (EXCEDE SALDO)" : "AUTORIZAR PROPUESTA"}
                   </button>
                 </div>
               ))}
             </div>
           </div>
         ) : (
-          <div className={styles.empty}>Seleccione una solicitud para revisar detalles</div>
+          <div className={styles.emptyState}>
+            <div className={styles.emptyIcon}>📂</div>
+            <p>Selecciona una solicitud para gestionar la autorización</p>
+          </div>
         )}
       </main>
+
+      {showMsjs && (
+        <div className={styles.modalOverlay}>
+          <div className={styles.modalMsj}>
+            <div className={styles.modalHeader}>
+              <h3>HISTORIAL DE MENSAJES</h3>
+              <button onClick={() => setShowMsjs(false)} className={styles.btnClose}>&times;</button>
+            </div>
+            <div className={styles.msjList}>
+              {todosLosMensajes.map((m: any, i: number) => (
+                <div key={i} className={styles.msjItem}>
+                  <span className={styles.msjFolio}>FOLIO #{m.folio}</span>
+                  <p>{m.motivo}</p>
+                  <small>{new Date(m.fecha).toLocaleString()}</small>
+                </div>
+              ))}
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

@@ -1,63 +1,134 @@
 .container {
-  width: 100%;
-  max-width: 1000px;
-  margin: 0 auto;
+  display: flex;
+  height: calc(100vh - 70px);
+  background: #050505;
+  color: #fff;
 }
 
-.card {
+.azulClaro { color: #00d2ff; text-shadow: 0 0 10px rgba(0, 210, 255, 0.4); }
+
+/* Sidebar */
+.sidebar {
+  width: 320px;
+  background: #0a0a0a;
+  border-right: 1px solid #1a1a1a;
+  display: flex;
+  flex-direction: column;
+}
+
+.headerSidebar { padding: 20px; border-bottom: 1px solid #1a1a1a; }
+.subtext { font-size: 10px; color: #444; letter-spacing: 2px; }
+
+.scrollArea { flex: 1; overflow-y: auto; padding: 15px; }
+
+.cardSolicitud {
   background: #111;
-  border: 1px solid rgba(0, 255, 65, 0.2);
-  padding: 1.5rem;
-  border-radius: 8px;
-  margin-bottom: 1rem;
+  border: 1px solid #222;
+  padding: 15px;
+  border-radius: 10px;
+  margin-bottom: 12px;
+  cursor: pointer;
+  transition: 0.2s;
+}
+
+.cardSolicitud:hover { border-color: #00d2ff; background: #151515; }
+.cardActive { border-color: #00d2ff; background: #0d1a20; box-shadow: inset 0 0 15px rgba(0, 210, 255, 0.1); }
+
+.folio { color: #00d2ff; font-family: monospace; font-size: 12px; }
+.fechaCard { font-size: 11px; color: #555; margin-top: 5px; }
+
+/* Main Panel */
+.mainPanel { flex: 1; display: flex; flex-direction: column; padding: 30px; overflow-y: auto; }
+
+.topBar {
   display: flex;
   justify-content: space-between;
   align-items: center;
-  transition: all 0.3s ease;
+  margin-bottom: 30px;
+  padding-bottom: 20px;
+  border-bottom: 1px solid #1a1a1a;
 }
 
-.card:hover {
-  border-color: #00ff41;
-  box-shadow: 0 0 10px rgba(0, 255, 65, 0.1);
+.filterGroup label { display: block; font-size: 10px; color: #555; margin-bottom: 5px; }
+.filterGroup input {
+  background: #000;
+  border: 1px solid #333;
+  color: #fff;
+  padding: 8px;
+  border-radius: 5px;
 }
 
-.folio {
-  font-family: monospace;
-  color: #00ff41;
-  font-size: 0.75rem;
-  letter-spacing: 1px;
+/* Detalle y Formulario */
+.detalleContainer { max-width: 900px; }
+
+.infoBox {
+  background: #0f0f0f;
+  padding: 20px;
+  border-radius: 12px;
+  border-left: 4px solid #00d2ff;
+  margin-bottom: 30px;
 }
+
+.itemRow { font-size: 14px; margin-top: 8px; color: #ccc; }
+
+.actionsGrid { display: grid; grid-template-columns: 1.5fr 1fr; gap: 20px; }
+
+.formEntrega {
+  background: #111;
+  padding: 25px;
+  border-radius: 15px;
+  border: 1px solid #222;
+}
+
+.formEntrega input {
+  width: 100%;
+  background: #000;
+  border: 1px solid #333;
+  padding: 12px;
+  margin-bottom: 10px;
+  color: #fff;
+  border-radius: 6px;
+}
+
+.rowInputs { display: flex; gap: 10px; }
 
 .btnSurtir {
-  background: #00ff41;
-  color: black;
-  font-weight: bold;
-  padding: 0.6rem 1.2rem;
-  border-radius: 4px;
-  font-size: 0.7rem;
-  cursor: pointer;
+  width: 100%;
+  background: #00d2ff;
+  color: #000;
+  padding: 15px;
   border: none;
-  transition: 0.3s;
+  border-radius: 6px;
+  font-weight: bold;
+  cursor: pointer;
+  margin-top: 10px;
 }
 
-.btnSurtir:hover {
-  box-shadow: 0 0 15px #00ff41;
-  transform: scale(1.05);
+.noStockZone {
+  background: #1a0d0d;
+  padding: 25px;
+  border-radius: 15px;
+  border: 1px solid #3d1a1a;
+  text-align: center;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
 }
 
 .btnNoStock {
   background: transparent;
-  color: #ff4141;
-  border: 1px solid #ff4141;
-  font-weight: bold;
-  padding: 0.6rem 1.2rem;
-  border-radius: 4px;
-  font-size: 0.7rem;
+  border: 1px solid #ff4b2b;
+  color: #ff4b2b;
+  padding: 12px;
+  border-radius: 6px;
   cursor: pointer;
-  transition: 0.3s;
+  margin-top: 15px;
 }
 
-.btnNoStock:hover {
-  background: rgba(255, 65, 65, 0.1);
-  box-shadow: 0 0 10px #ff4141;
+.placeholderMain {
+  text-align: center;
+  margin-top: 15%;
+  opacity: 0.2;
 }
+
+.radarIcon { font-size: 60px; margin-bottom: 20px; }

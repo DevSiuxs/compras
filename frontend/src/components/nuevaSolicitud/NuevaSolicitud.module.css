@@ -1,37 +1,150 @@
 .container {
-  width: 100%;
-  max-width: 800px;
-  margin: 0 auto;
+  padding: 2rem;
+  display: flex;
+  justify-content: center;
+  align-items: flex-start;
+  min-height: 100%;
 }
 
-.input {
+.glassCard {
+  background: rgba(13, 13, 13, 0.7);
+  backdrop-filter: blur(10px);
+  border: 1px solid rgba(255, 255, 255, 0.05);
+  border-radius: 20px;
   width: 100%;
-  background: #111;
-  border: 1px solid rgba(0, 255, 65, 0.2);
+  max-width: 800px;
+  padding: 2.5rem;
+  box-shadow: 0 20px 50px rgba(0, 0, 0, 0.5);
+}
+
+.header {
+  display: flex;
+  align-items: center;
+  gap: 1.5rem;
+  margin-bottom: 3rem;
+}
+
+.iconCircle {
+  width: 60px;
+  height: 60px;
+  background: linear-gradient(135deg, #0070f3, #00aaff);
+  border-radius: 15px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 1.5rem;
+}
+
+.header h1 { font-size: 1.8rem; letter-spacing: -0.5px; margin: 0; }
+.header p { color: #666; font-size: 0.9rem; margin-top: 4px; }
+
+.sectionTitle {
+  font-size: 10px;
+  text-transform: uppercase;
+  letter-spacing: 2px;
+  color: #0070f3;
+  font-weight: 700;
+  margin-bottom: 1.5rem;
+  margin-top: 2rem;
+  border-bottom: 1px solid rgba(0, 112, 243, 0.2);
+  padding-bottom: 0.5rem;
+}
+
+.form { display: flex; flex-direction: column; gap: 1.2rem; }
+
+.row { display: grid; grid-template-columns: 1fr 1fr; gap: 1.5rem; }
+
+.field { display: flex; flex-direction: column; gap: 0.6rem; }
+
+.field label {
+  font-size: 11px;
+  font-weight: 600;
+  color: #888;
+  letter-spacing: 0.5px;
+}
+
+.field input, .field select, .field textarea {
+  background: rgba(255, 255, 255, 0.03);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 10px;
+  padding: 0.9rem;
   color: white;
-  padding: 10px;
-  font-size: 0.8rem;
-  border-radius: 4px;
+  font-size: 0.95rem;
+  transition: all 0.2s;
   outline: none;
 }
 
-.input:focus {
-  border-color: #00ff41;
+.field input:focus, .field select:focus, .field textarea:focus {
+  border-color: #0070f3;
+  background: rgba(0, 112, 243, 0.05);
+  box-shadow: 0 0 15px rgba(0, 112, 243, 0.1);
 }
 
-.btnNeon {
-  width: 100%;
-  padding: 15px;
-  background: transparent;
-  border: 1px solid #00ff41;
-  color: #00ff41;
-  font-weight: bold;
+.field textarea { min-height: 100px; resize: none; }
+
+.submitBtn {
+  margin-top: 2rem;
+  padding: 1.2rem;
+  background: #0070f3;
+  color: white;
+  border: none;
+  border-radius: 12px;
+  font-weight: 800;
+  font-size: 1rem;
+  letter-spacing: 1px;
   cursor: pointer;
-  transition: 0.3s;
+  transition: transform 0.2s, background 0.2s;
 }
 
-.btnNeon:hover {
-  background: #00ff41;
-  color: black;
-  box-shadow: 0 0 20px #00ff41;
+.submitBtn:hover {
+  background: #0081ff;
+  transform: translateY(-2px);
+}
+
+.submitBtn:disabled {
+  background: #333;
+  cursor: not-allowed;
+}
+
+/* Estilo base para el select */
+.selectColorido {
+  cursor: pointer;
+  outline: none;
+}
+
+/* Colores de fondo para las opciones (El navegador los aplica al abrir el desplegable) */
+.selectColorido option {
+  background-color: #1a1a1a; /* Fondo oscuro para que contraste con el cristal */
+  color: white;
+  padding: 10px;
+}
+
+/* Clases de utilidad para colores específicos si los necesitas */
+.bgAzul { border-left: 4px solid #0070f3 !important; }
+.bgVerde { border-left: 4px solid #00ff41 !important; }
+.bgAmarillo { border-left: 4px solid #ffca28 !important; }
+.bgRojo { border-left: 4px solid #ff4d4d !important; }
+
+/* Esto ya lo tienes, pero asegúrate de que tenga estas propiedades */
+.field select {
+  background: rgba(255, 255, 255, 0.03);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  color: white;
+  appearance: none; /* Quita el estilo por defecto del sistema */
+  cursor: pointer;
+}
+
+/* EL TRUCO: Estilo para las opciones cuando el select se despliega */
+.field select option {
+  background-color: #121212; /* Fondo oscuro sólido para que sea legible */
+  color: white;
+  padding: 12px;
+}
+
+/* Cambiar el color del borde y un brillo azul cuando seleccionas algo */
+.field select:focus {
+  border-color: #0070f3;
+  background: rgba(0, 112, 243, 0.05);
+  box-shadow: 0 0 15px rgba(0, 112, 243, 0.2);
+  outline: none;
 }

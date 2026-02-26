@@ -9,14 +9,8 @@ export default function Comprar() {
   const [mostrarModalMensaje, setMostrarModalMensaje] = useState(false);
   const [motivoMensaje, setMotivoMensaje] = useState('');
 
-  // Colores para la interfaz
-  const COLORES_MAP: any = {
-    AZUL: '#00d2ff',
-    VERDE: '#00ff41',
-    AMARILLO: '#ffca28',
-    NARANJA: '#ff9800',
-    ROJO: '#ff4d4d'
-  };
+  // Prioridad: ROJO(5) > NARANJA(4) > AMARILLO(3) > VERDE(2) > AZUL(1)
+  const COLORES_PRIORIDAD: any = { ROJO: 5, NARANJA: 4, AMARILLO: 3, VERDE: 2, AZUL: 1 };
 
   const cargarDatos = async () => {
     try {
@@ -26,141 +20,165 @@ export default function Comprar() {
 
       const resS = await fetch('http://localhost:3000/compras/pendientes');
       const dataS = await resS.json();
-      setPendientes(dataS);
-    } catch (e) { console.error("Error cargando compras", e); }
+
+      const ordenados = dataS.sort((a: any, b: any) => {
+        const pA = COLORES_PRIORIDAD[a.prioridad] || 0;
+        const pB = COLORES_PRIORIDAD[b.prioridad] || 0;
+        if (pB !== pA) return pB - pA;
+        return new Date(a.fechaCreacion).getTime() - new Date(b.fechaCreacion).getTime();
+      });
+      setPendientes(ordenados);
+    } catch (e) { console.error(e); }
   };
 
   useEffect(() => { cargarDatos(); }, []);
 
-  const obtenerColorStatus = (sol: any) => {
-    if (sol.prioridad && !['PENDIENTE', 'AZUL'].includes(sol.prioridad)) return sol.prioridad;
-    if (sol.cotizaciones[0]?.monto > presupuesto) return 'ROJO';
-    return 'AZUL';
-  };
-
   const handleComprar = async (id: number) => {
-    if (!confirm('¿Confirmar ejecución de compra?')) return;
+    // API ejecutando compra (resta saldo en el backend)
     const res = await fetch(`http://localhost:3000/compras/${id}/ejecutar`, { method: 'POST' });
     if (res.ok) {
-      alert("Compra ejecutada con éxito");
       setSeleccionada(null);
       cargarDatos();
+    } else {
+      const err = await res.json();
+      alert(err.message || "Error al procesar el pago");
     }
   };
 
   const enviarMensaje = async () => {
-    if (!motivoMensaje) return alert("Escribe un motivo");
-    const res = await fetch(`http://localhost:3000/compras/${seleccionada.id}/notificar-presupuesto`, {
+    if (!motivoMensaje) return;
+    await fetch(`http://localhost:3000/compras/${seleccionada.id}/notificar-presupuesto`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ motivo: motivoMensaje })
     });
-    if (res.ok) {
-      alert("Mensaje enviado a Autorización");
-      setMostrarModalMensaje(false);
-      setMotivoMensaje('');
-      setSeleccionada(null);
-      cargarDatos();
-    }
+    setMostrarModalMensaje(false);
+    setMotivoMensaje('');
+    setSeleccionada(null);
+    cargarDatos();
   };
+
+  const cotizacion = seleccionada?.cotizaciones?.find((c: any) => c.seleccionada);
 
   return (
     <div className={styles.container}>
       <aside className={styles.sidebar}>
+        <div className={styles.sidebarHeader}>
+          <p className={styles.miniTag}>PAGOS PENDIENTES</p>
+          <h2>CENTRAL DE COMPRAS</h2>
+        </div>
+
         <div className={styles.budgetCard}>
-          <p>Presupuesto Global Disponible</p>
-          <h2 className={styles.blueValue}>${presupuesto.toLocaleString()}</h2>
+          <span className={styles.label}>SALDO GLOBAL</span>
+          <p className={styles.blueValue}>${presupuesto.toLocaleString()}</p>
         </div>
 
         <div className={styles.scrollArea}>
           {pendientes.map(sol => (
             <div
               key={sol.id}
-              className={`${styles.solCard} ${seleccionada?.id === sol.id ? styles.active : ''}`}
+              className={`${styles.solCard} ${seleccionada?.id === sol.id ? styles.activeCard : ''}`}
               onClick={() => setSeleccionada(sol)}
-              style={{ '--this-color': COLORES_MAP[obtenerColorStatus(sol)] } as any}
             >
-              <div className={styles.statusLine}></div>
-              <div>
-                <p className={styles.folioText}>FOLIO #{sol.id.toString().padStart(4, '0')}</p>
-                <p className={styles.empresaText}>{sol.empresa?.nombre}</p>
+              <div className={styles.cardInfo}>
+                <span className={styles.folio}>#{sol.folio}</span>
+                <p className={styles.empresa}>{sol.empresa?.nombre}</p>
               </div>
+              <div className={styles.priorityDot} style={{ background: `var(--${sol.prioridad?.toLowerCase()})` }} />
             </div>
           ))}
         </div>
       </aside>
 
-      <main className={styles.main}>
-        {seleccionada ? (
-          <div className={styles.content}>
-            <header className={styles.header}>
-              <div>
-                <h1>{seleccionada.empresa?.nombre}</h1>
-                <p className={styles.fecha}>Solicitado el {new Date(seleccionada.fechaCreacion).toLocaleDateString()}</p>
+      <main className={styles.mainContent}>
+        {seleccionada && cotizacion ? (
+          <div className={styles.detailView}>
+            <header className={styles.detailHeader}>
+              <div className={styles.headerInfo}>
+                <div className={styles.priorityLabel} style={{ borderColor: `var(--${seleccionada.prioridad?.toLowerCase()})`, color: `var(--${seleccionada.prioridad?.toLowerCase()})` }}>
+                  URGENCIA: {seleccionada.prioridad}
+                </div>
+                <h1>Solicitud #{seleccionada.folio}</h1>
               </div>
-              <div className={styles.badge} style={{ background: COLORES_MAP[obtenerColorStatus(seleccionada)] }}>
-                PRIORIDAD {obtenerColorStatus(seleccionada)}
+              <div className={styles.provInfo}>
+                <span className={styles.label}>PROVEEDOR ADJUDICADO</span>
+                <p>{cotizacion.proveedor}</p>
               </div>
             </header>
 
-            <div className={styles.detailsGrid}>
-              <div className={styles.box}>
-                <p className={styles.label}>Proveedor Seleccionado</p>
-                <h3>{seleccionada.cotizaciones[0]?.proveedor}</h3>
-                <p className={styles.monto} style={{ color: COLORES_MAP[obtenerColorStatus(seleccionada)] }}>
-                  ${seleccionada.cotizaciones[0]?.monto.toLocaleString()}
-                </p>
-              </div>
-              <div className={styles.box}>
-                <p className={styles.label}>Artículos a Comprar</p>
-                <ul className={styles.list}>
-                  {seleccionada.items?.map((it: any) => (
-                    <li key={it.id}>{it.cantidad} {it.unidad?.nombre} - {it.descripcion}</li>
-                  ))}
-                </ul>
-              </div>
-            </div>
+            <div className={styles.contentGrid}>
+              <section className={styles.itemsSection}>
+                <h3>LISTA DE ARTÍCULOS</h3>
+                <div className={styles.tableWrapper}>
+                    <table className={styles.table}>
+                    <thead>
+                        <tr>
+                        <th>Cant.</th>
+                        <th>Descripción</th>
+                        <th>Unidad</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {seleccionada.items?.map((item: any, i: number) => (
+                        <tr key={i}>
+                            <td className={styles.bold}>{item.cantidad}</td>
+                            <td>{item.descripcion}</td>
+                            <td>{item.unidad?.nombre}</td>
+                        </tr>
+                        ))}
+                    </tbody>
+                    </table>
+                </div>
+              </section>
 
-            <div className={styles.actions}>
-              <button
-                className={styles.btnComprar}
-                disabled={seleccionada.cotizaciones[0]?.monto > presupuesto}
-                onClick={() => handleComprar(seleccionada.id)}
-              >
-                Aceptar Compra
-              </button>
+              <section className={styles.paymentSection}>
+                <div className={styles.totalCard}>
+                  <span className={styles.label}>MONTO A DISPERSAR</span>
+                  <p className={styles.totalAmount}>${cotizacion.monto.toLocaleString()}</p>
+                  <div className={styles.divider} />
+                  <p className={styles.obs}>{cotizacion.observaciones || 'Sin observaciones de autorización'}</p>
+                </div>
 
-              <button className={styles.btnMensaje} onClick={() => setMostrarModalMensaje(true)}>
-                Notificar Falta de Saldo
-              </button>
+                <div className={styles.actions}>
+                  {/* BOTÓN SIEMPRE HABILITADO - SOLO CAMBIA EL TEXTO SEGÚN SALDO */}
+                  <button
+                    className={`${styles.btnConfirm} ${cotizacion.monto > presupuesto ? styles.btnWarning : ''}`}
+                    onClick={() => handleComprar(seleccionada.id)}
+                  >
+                    {cotizacion.monto > presupuesto ? "AUTORIZAR PAGO (SIN SALDO)" : "CONFIRMAR Y PAGAR"}
+                  </button>
+
+                  <button
+                    className={styles.btnMensaje}
+                    onClick={() => setMostrarModalMensaje(true)}
+                  >
+                    NOTIFICAR INCIDENCIA / FALTA SALDO
+                  </button>
+                </div>
+              </section>
             </div>
           </div>
         ) : (
-          <div className={styles.emptyState}>Selecciona un folio para procesar el pago</div>
+          <div className={styles.emptyState}>
+            <div className={styles.scanline} />
+            <p>TERMINAL DE PAGOS LISTA</p>
+          </div>
         )}
       </main>
 
-      {/* MODAL DE MENSAJE */}
       {mostrarModalMensaje && (
         <div className={styles.modalOverlay}>
           <div className={styles.modal}>
-            <h3 className={styles.blueText}>REPORTAR PROBLEMA</h3>
-            <p style={{fontSize: '11px', color: '#666', marginBottom: '1rem'}}>Indica por qué no se puede realizar la compra.</p>
-
+            <h3>NOTIFICACIÓN DE COMPRAS</h3>
+            <p className={styles.label}>Motivo del reporte para autorización:</p>
             <textarea
-              className={styles.modalTextarea}
               value={motivoMensaje}
               onChange={(e) => setMotivoMensaje(e.target.value)}
-              placeholder="Ej: El presupuesto es insuficiente..."
+              placeholder="Ej. El proveedor no tiene stock o el presupuesto es insuficiente..."
             />
-
             <div className={styles.modalActions}>
-              <button onClick={enviarMensaje} className={styles.btnSend}>
-                Enviar a Autorización
-              </button>
-              <button onClick={() => setMostrarModalMensaje(false)} className={styles.btnCancel}>
-                Cerrar
-              </button>
+              <button onClick={enviarMensaje} className={styles.btnSend}>ENVIAR MENSAJE</button>
+              <button onClick={() => setMostrarModalMensaje(false)} className={styles.btnCancel}>VOLVER</button>
             </div>
           </div>
         </div>

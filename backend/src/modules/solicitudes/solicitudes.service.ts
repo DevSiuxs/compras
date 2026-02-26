@@ -1,34 +1,48 @@
+// src/modules/solicitudes/solicitudes.service.ts
 import { Injectable } from '@nestjs/common';
 import { PrismaService } from 'src/prisma/prisma.service';
+import { CreateSolicitudDto } from './dto/create-solicitud.dto';
 
 @Injectable()
 export class SolicitudesService {
   constructor(private prisma: PrismaService) {}
 
-  /**
-   * Crea una nueva solicitud con folios automáticos y conversión de tipos
-   */
-  async crear(data: any) {
-    // 1. Generar Folio Automático (Ej: SOL-2024-001)
-    const conteo = await this.prisma.solicitud.count();
-    const año = new Date().getFullYear();
-    const folio = `SOL-${año}-${(conteo + 1).toString().padStart(3, '0')}`;
+  async crear(datos: CreateSolicitudDto) {
+    // 1. Obtener la fecha actual (Hoy)
+    const hoy = new Date();
+    const inicioDia = new Date(hoy.setHours(0, 0, 0, 0));
+    const finDia = new Date(hoy.setHours(23, 59, 59, 999));
 
-    // 2. Crear registro en la base de datos
+    // 2. Contar cuántas solicitudes se han hecho SOLO HOY para reiniciar el contador
+    const totalHoy = await this.prisma.solicitud.count({
+      where: {
+        fechaCreacion: {
+          gte: inicioDia,
+          lte: finDia,
+        },
+      },
+    });
+
+    // 3. Formatear Día y Mes (ej: 2502 para 25 de Febrero)
+    const dia = String(new Date().getDate()).padStart(2, '0');
+    const mes = String(new Date().getMonth() + 1).padStart(2, '0');
+
+    // 4. Generar Folio: SOL-DiaMes-Contador(4 digitos para que no sea excesivo)
+    // Ejemplo: SOL-2502-0001
+    const nuevoNumero = (totalHoy + 1).toString().padStart(4, '0');
+    const folio = `SOL-${dia}${mes}-${nuevoNumero}`;
+
     return this.prisma.solicitud.create({
       data: {
-        folio: folio,
-        justificacion: data.justificacion,
-        // El campo 'area' es texto libre como solicitaste
-        area: data.area,
-        // Aseguramos que el idEmpresa sea tratado como número por Prisma
-        idEmpresa: Number(data.idEmpresa),
+        folio,
+        justificacion: datos.justificacion,
+        idEmpresa: Number(datos.idEmpresa),
+        idArea: Number(datos.idArea),
         status: 'SOLICITADO',
         prioridad: 'AZUL',
         fechaResetColor: new Date(),
-        // Creación anidada de los ítems de la solicitud
         items: {
-          create: data.items.map((item: any) => ({
+          create: datos.items.map((item) => ({
             descripcion: item.descripcion,
             cantidad: Number(item.cantidad),
             idUnidad: Number(item.idUnidad),
@@ -36,27 +50,21 @@ export class SolicitudesService {
         },
       },
       include: {
-        items: true, // Incluye los ítems creados en la respuesta
-      },
+        items: true,
+        empresa: true,
+        area: true
+      }
     });
   }
 
-  /**
-   * Lista todas las solicitudes con la información de empresa y unidades
-   */
   async listarTodas() {
     return this.prisma.solicitud.findMany({
       include: {
-        empresa: true, // Trae el nombre de la empresa asociada
-        items: {
-          include: {
-            unidad: true // Trae el nombre de la unidad (Pza, Kg, etc.)
-          }
-        }
+        empresa: true,
+        area: true,
+        items: { include: { unidad: true } }
       },
-      orderBy: {
-        id: 'desc' // Las más recientes primero
-      }
+      orderBy: { fechaCreacion: 'desc' }
     });
   }
 }

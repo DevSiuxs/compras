@@ -8,6 +8,7 @@ import { CotizacionModule } from './modules/cotizacion/cotizacion.module';
 import { AutorizarModule } from './modules/autorizacion/autorizacion.module';
 import { ComprasModule } from './modules/compras/compras.module';
 import { ReportesModule } from './reportes/reportes.module';
+import { RecepcionModule } from './modules/recepcion/recepcion.module';
 
 @Module({
   imports: [
@@ -17,7 +18,8 @@ import { ReportesModule } from './reportes/reportes.module';
     CotizacionModule,
     AutorizarModule,
     ComprasModule,
-    ReportesModule // <--- TAMBIÉN AQUÍ
+    ReportesModule,
+    RecepcionModule // <--- TAMBIÉN AQUÍ
   ],
   controllers: [],
   providers: [PrismaService],

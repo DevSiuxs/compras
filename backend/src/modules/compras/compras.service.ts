@@ -5,84 +5,70 @@ import { PrismaService } from 'src/prisma/prisma.service';
 export class ComprasService {
   constructor(private prisma: PrismaService) {}
 
-  // 1. Validar y comprar// compras.service.ts modificado
-
-async ejecutarCompra(solicitudId: number) {
-  const solicitud = await this.prisma.solicitud.findUnique({
-    where: { id: solicitudId },
-    include: { cotizaciones: { where: { seleccionada: true } } }
-  });
-
-  const cotizacionGanadora = solicitud?.cotizaciones[0];
-  const config = await this.prisma.configuracionGlobal.findFirst();
-
-  if (!cotizacionGanadora || !config) throw new BadRequestException('Datos incompletos');
-
-  if (config.presupuestoGlobal < cotizacionGanadora.monto) {
-    throw new BadRequestException('Fondos insuficientes.');
+  async listarPendientes() {
+    return this.prisma.solicitud.findMany({
+      where: {
+        status: { in: ['COMPRAR', 'PENDIENTE_AJUSTE'] }
+      },
+      include: {
+        empresa: true,
+        items: { include: { unidad: true } },
+        cotizaciones: { where: { seleccionada: true } },
+        mensajes: true
+      },
+      orderBy: { fechaCreacion: 'asc' }
+    });
   }
 
-  return this.prisma.$transaction(async (tx) => {
-    // 1. Restar dinero del presupuesto global
-    await tx.configuracionGlobal.update({
-      where: { id: config.id },
-      data: { presupuestoGlobal: { decrement: cotizacionGanadora.monto } }
-    });
-
-    // 2. Finalizar la solicitud guardando los datos para el DASHBOARD
-    return tx.solicitud.update({
+  async ejecutarCompra(solicitudId: number) {
+    const solicitud = await this.prisma.solicitud.findUnique({
       where: { id: solicitudId },
-      data: {
-        status: 'PAGADO', // Cambiamos el status final
-        montoFinal: cotizacionGanadora.monto, // Guardamos cuánto costó
-        proveedorFinal: cotizacionGanadora.proveedor, // Quién lo vendió
-        fechaFinalizado: new Date(), // Fecha exacta del cierre
-      }
+      include: { cotizaciones: { where: { seleccionada: true } } }
     });
-  });
-}
 
-  // 2. Enviar mensaje por falta de presupuesto
+    const cotizacionGanadora = solicitud?.cotizaciones[0];
+    const config = await this.prisma.configuracionGlobal.findFirst();
+
+    if (!cotizacionGanadora || !config) throw new BadRequestException('Datos incompletos');
+    if (config.presupuestoGlobal < cotizacionGanadora.monto) {
+      throw new BadRequestException('Fondos insuficientes.');
+    }
+
+    return this.prisma.$transaction(async (tx) => {
+      await tx.configuracionGlobal.update({
+        where: { id: config.id },
+        data: { presupuestoGlobal: { decrement: cotizacionGanadora.monto } }
+      });
+
+      return tx.solicitud.update({
+        where: { id: solicitudId },
+        data: {
+          status: 'RECIBIDO', // Pasa a almacén como recibido
+          montoFinal: cotizacionGanadora.monto,
+          proveedorFinal: cotizacionGanadora.proveedor,
+          fechaFinalizado: new Date(),
+        }
+      });
+    });
+  }
+
   async notificarFaltaPresupuesto(solicitudId: number, motivo: string) {
     return this.prisma.$transaction(async (tx) => {
-      // Creamos el registro en la nueva tabla Mensaje
       await tx.mensaje.create({
         data: {
           solicitudId,
           motivo,
-          leido: false
+          fecha: new Date()
         }
       });
 
-      // Cambiamos el status para que Autorizar lo vea como "Pendiente"
       return tx.solicitud.update({
         where: { id: solicitudId },
-        data: { status: 'PENDIENTE_AJUSTE' }
+        data: {
+          status: 'PENDIENTE_AJUSTE'
+          // IMPORTANTE: No tocamos 'prioridad', así el color no se reinicia
+        }
       });
     });
   }
-  // ... dentro de la clase ComprasService
-
-async listarPendientes() {
-  return this.prisma.solicitud.findMany({
-    where: {
-      status: {
-        in: ['COMPRAR', 'PENDIENTE_AJUSTE'] // Trae las autorizadas y las que rebotaron por falta de saldo
-      }
-    },
-    include: {
-      empresa: true,
-      items: { include: { unidad: true } },
-      cotizaciones: {
-        where: { seleccionada: true } // Solo nos interesa ver la que el jefe eligió
-      },
-      mensajes: {
-        orderBy: { fecha: 'desc' } // Traer los mensajes para ver el historial de por qué no se ha comprado
-      }
-    },
-    orderBy: {
-      fechaResetColor: 'asc' // Prioridad por la fecha de semáforo más vieja
-    }
-  });
-}
 }

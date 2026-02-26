@@ -5,106 +5,115 @@ import { PrismaService } from 'src/prisma/prisma.service';
 export class ReportesService {
   constructor(private prisma: PrismaService) {}
 
+  // 1. Método para el Dashboard (Acepta fechas opcionales para quitar el error TS2554)
   async obtenerDashboardAdmin(fechaInicio?: string, fechaFin?: string) {
-    const filtroFecha = fechaInicio && fechaFin ? {
-      fechaCreacion: { gte: new Date(fechaInicio), lte: new Date(fechaFin) }
-    } : {};
+    // Crear filtro de fecha si existen
+    const filtro: any = {};
+    if (fechaInicio && fechaFin) {
+      filtro.fechaCreacion = {
+        gte: new Date(fechaInicio),
+        lte: new Date(fechaFin),
+      };
+    }
 
     const todas = await this.prisma.solicitud.findMany({
-      where: filtroFecha,
-      include: {
-        empresa: true,
-        cotizaciones: true,
-        mensajes: true,
-      },
-      orderBy: { fechaCreacion: 'desc' }
-    });
+      where: filtro,
+      include: { empresa: true, cotizaciones: true }
+    }) || [];
 
     const config = await this.prisma.configuracionGlobal.findFirst();
 
-    const porStatus = todas.reduce((acc, s) => {
-      acc[s.status] = (acc[s.status] || 0) + 1;
-      return acc;
-    }, {} as Record<string, number>);
+    // Conteo por secciones (Garantiza 0 si está vacío)
+    const conteoSecciones = {
+      ALMACEN: todas.filter(s => s.status === 'SOLICITADO').length || 0,
+      COTIZANDO: todas.filter(s => s.status === 'COTIZANDO').length || 0,
+      AUTORIZAR: todas.filter(s => s.status === 'AUTORIZAR').length || 0,
+      COMPRAS: todas.filter(s => s.status === 'COMPRAR').length || 0,
+      RECEPCION: todas.filter(s => s.status === 'RECIBIDO').length || 0,
+      FINALIZADO: todas.filter(s => s.status === 'ENTREGADO').length || 0,
+    };
 
-    const pagadas = todas.filter(s => s.status === 'PAGADO' || s.status === 'COMPRADO');
-    const gastoTotal = pagadas.reduce((acc, s) => acc + (s.montoFinal || 0), 0);
+    // Gasto total (Suma segura)
+    const gastoTotal = todas.reduce((acc, s) => {
+      const monto = s.montoFinal ? Number(s.montoFinal) : 0;
+      return acc + monto;
+    }, 0);
 
-    const gastosPorDia = pagadas.reduce((acc, s) => {
-      const fecha = s.fechaFinalizado?.toLocaleDateString() || 'S/F';
-      acc[fecha] = (acc[fecha] || 0) + (s.montoFinal || 0);
-      return acc;
-    }, {} as Record<string, number>);
-
-    const gastosHistorial = Object.entries(gastosPorDia).map(([fecha, monto]) => ({
-      fecha,
-      monto
-    }));
+    // Datos para la gráfica (Array vacío si no hay nada)
+    const graficoGastos = todas.length > 0
+      ? todas.slice(0, 10).map(s => ({
+          name: s.folio,
+          gasto: Number(s.montoFinal) || 0
+        }))
+      : [];
 
     return {
-      stats: {
-        presupuestoDisponible: config?.presupuestoGlobal || 0,
-        gastoTotal,
-        totalTickets: todas.length,
-      },
-      porStatus,
-      solicitudes: todas,
-      gastosHistorial: gastosHistorial.sort((a, b) => new Date(a.fecha).getTime() - new Date(b.fecha).getTime())
+      presupuestoRestante: config?.presupuestoGlobal || 0,
+      gastoTotal: gastoTotal,
+      totalTickets: todas.length || 0,
+      conteoSecciones,
+      graficoGastos,
+      recientes: todas.slice(0, 5)
     };
   }
 
+  // 2. Método de Detalle (Para corregir el error TS2339)
   async obtenerDetalleLineaTiempo(id: number) {
-    // CORRECCIÓN: Se asegura que el objeto devuelto incluya las relaciones para que TS no de error
     const sol = await this.prisma.solicitud.findUnique({
-      where: { id },
+      where: { id: Number(id) },
       include: {
         empresa: true,
-        cotizaciones: true, // Se eliminó el orderBy problemático si Prisma no lo detecta aún
+        cotizaciones: true,
         mensajes: true
       }
     });
 
-    if (!sol) throw new NotFoundException(`Solicitud ${id} no encontrada`);
+    if (!sol) throw new NotFoundException(`La solicitud con ID ${id} no existe`);
 
-    const eventos: any[] = [
+    // Construcción de la línea de tiempo
+    const timeline: any[] = [
       {
         fecha: sol.fechaCreacion,
-        evento: 'SOLICITUD',
-        detalle: `Creada para ${sol.empresa.nombre}.`,
+        evento: 'CREACIÓN',
+        detalle: `Solicitud generada para ${sol.empresa?.nombre}`,
         color: '#0070f3'
       }
     ];
 
-    // Acceso seguro a relaciones
-    sol.cotizaciones?.forEach((c: any) => {
-      eventos.push({
-        fecha: c.createdAt || new Date(), // Fallback por si la migración no ha corrido
+    // Agregar cotizaciones si existen
+    sol.cotizaciones?.forEach(c => {
+      timeline.push({
+        fecha: c.createdAt || new Date(),
         evento: 'COTIZACIÓN',
         detalle: `Proveedor: ${c.proveedor} - $${c.monto.toLocaleString()}`,
         color: c.seleccionada ? '#00ff41' : '#444'
       });
     });
 
-    sol.mensajes?.forEach((m: any) => {
-      eventos.push({
-        fecha: m.createdAt || new Date(),
+    // Agregar mensajes/observaciones
+    sol.mensajes?.forEach(m => {
+      timeline.push({
+        fecha: m.fecha || new Date(),
         evento: 'OBSERVACIÓN',
         detalle: m.motivo,
-        color: '#ff9800'
+        color: '#ffca28'
       });
     });
 
     if (sol.fechaFinalizado) {
-      eventos.push({
+      timeline.push({
         fecha: sol.fechaFinalizado,
-        evento: 'CIERRE',
-        detalle: `Pagado a ${sol.proveedorFinal} por $${sol.montoFinal?.toLocaleString()}`,
-        color: '#00ff41'
+        evento: 'COMPRA EJECUTADA',
+        detalle: `Monto final: $${sol.montoFinal?.toLocaleString()}`,
+        color: '#ff0080'
       });
     }
 
-    const timeline = eventos.sort((a, b) => new Date(a.fecha).getTime() - new Date(b.fecha).getTime());
-
-    return { ...sol, timeline };
+    return {
+      folio: sol.folio,
+      empresa: sol.empresa,
+      status: sol.status,
+      timeline: timeline.sort((a, b) => new Date(a.fecha).getTime() - new Date(b.fecha).getTime())
+    };
   }
 }

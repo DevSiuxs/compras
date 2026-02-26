@@ -2,18 +2,21 @@
 import { useState } from "react";
 import styles from "./page.module.css";
 
-// Importación de componentes
 import Catalogo from "@/components/catalogo/Catalogo";
 import NuevaSolicitud from "@/components/nuevaSolicitud/NuevaSolicitud";
 import Almacen from "@/components/almacen/Almacen";
 import Cotizacion from "@/components/cotizacion/Cotizacion";
 import Autorizar from "@/components/autorizacion/Autorizacion";
 import Comprar from "@/components/compras/comprar";
-import Dashboard from "@/components/dashboard/Dashboard"; // <--- NUEVA IMPORTACIÓN
+import Dashboard from "@/components/dashboard/Dashboard";
+import Recepcion from "@/components/recepcion/recepcion";
+// IMPORTA TU NUEVO COMPONENTE
+import HistorialGeneral from "@/components/dashboard/historial/HistorialGeneral";
 
 export default function MainApp() {
   const [seccion, setSeccion] = useState("dashboard");
 
+  // EL HISTORIAL NO ESTÁ AQUÍ (NO SE VERÁ EN EL NAV)
   const menuItems = [
     { id: "dashboard", label: "DASHBOARD", icon: "📊" },
     { id: "nueva", label: "SOLICITUDES", icon: "📝" },
@@ -27,15 +30,19 @@ export default function MainApp() {
 
   const renderSeccion = () => {
     switch (seccion) {
-      // ACTUALIZADO: Ahora renderiza el componente real
-      case "dashboard": return <Dashboard />;
+      case "dashboard":
+        // PASAMOS LA FUNCIÓN PARA CAMBIAR A HISTORIAL
+        return <Dashboard alVerHistorial={() => setSeccion("historial-oculto")} />;
+
+      case "historial-oculto":
+        return <HistorialGeneral />;
 
       case "nueva": return <NuevaSolicitud />;
       case "almacen": return <Almacen />;
       case "cotizacion": return <Cotizacion />;
       case "autorizar": return <Autorizar />;
       case "comprar": return <Comprar />;
-      case "recibido": return <div className={styles.placeholder}>📥 Módulo de Recepción y Entrega</div>;
+      case "recibido": return <Recepcion />;
       case "admin": return <Catalogo />;
       default: return <div className={styles.placeholder}>Seleccione una opción</div>;
     }
@@ -43,7 +50,6 @@ export default function MainApp() {
 
   return (
     <div className={styles.mainWrapper}>
-      {/* NAVBAR ESTILO VIP */}
       <nav className={styles.navbar}>
         <div className={styles.logoArea}>
           <span className={styles.logoIcon}>💎</span>
@@ -68,7 +74,6 @@ export default function MainApp() {
         </div>
       </nav>
 
-      {/* ÁREA DE CONTENIDO */}
       <main className={styles.contentArea}>
         {renderSeccion()}
       </main>

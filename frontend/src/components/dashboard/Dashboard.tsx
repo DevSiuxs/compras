@@ -1,24 +1,15 @@
 'use client';
-import { useState, useEffect, useMemo } from 'react';
+import { useState, useEffect } from 'react';
 import {
-  AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer,
-  PieChart, Pie, Cell
+  BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip,
+  ResponsiveContainer, Cell
 } from 'recharts';
 import styles from './Dashboard.module.css';
 
-const STATUS_COLORS: any = {
-  SOLICITADO: '#0070f3',
-  COTIZANDO: '#7928ca',
-  AUTORIZAR: '#ffca28',
-  COMPRAR: '#ff0080',
-  PAGADO: '#00ff41',
-  COMPRADO: '#00ff41'
-};
+interface DashboardProps { alVerHistorial?: () => void; }
 
-export default function Dashboard() {
+export default function Dashboard({ alVerHistorial }: DashboardProps) {
   const [data, setData] = useState<any>(null);
-  const [detallada, setDetallada] = useState<any>(null);
-  const [filtroStatus, setFiltroStatus] = useState('TODOS');
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
@@ -28,179 +19,96 @@ export default function Dashboard() {
         setData(d);
         setLoading(false);
       })
-      .catch(err => console.error("Error cargando dashboard:", err));
+      .catch(err => {
+        console.error("Error en Dashboard:", err);
+        setLoading(false);
+      });
   }, []);
 
-  const verTrazabilidad = (id: number) => {
-    fetch(`http://localhost:3000/reportes/detalle/${id}`)
-      .then(res => res.json())
-      .then(d => setDetallada(d));
+  if (loading) return <div className={styles.loading}>Sincronizando con base de datos...</div>;
+
+  // --- VARIABLES DE SEGURIDAD (Si data es null o faltan campos) ---
+  const presupuesto = data?.presupuestoRestante ?? 0;
+  const gasto = data?.gastoTotal ?? 0;
+  const totalSolicitudes = data?.totalTickets ?? 0;
+  const secciones = data?.conteoSecciones ?? {
+    ALMACEN: 0, COTIZANDO: 0, AUTORIZAR: 0, COMPRAS: 0, RECEPCION: 0, FINALIZADO: 0
   };
+  const grafico = data?.graficoGastos ?? [];
 
-  // Filtrado eficiente en memoria
-  const solicitudesFiltradas = useMemo(() => {
-    if (!data?.solicitudes) return [];
-    if (filtroStatus === 'TODOS') return data.solicitudes;
-    return data.solicitudes.filter((s: any) => s.status === filtroStatus);
-  }, [data, filtroStatus]);
-
-  if (loading) return (
-    <div className={styles.loaderContainer}>
-      <div className={styles.spinner}></div>
-      <span>SINCRONIZANDO DATOS...</span>
-    </div>
-  );
+  const presupuestoTotal = presupuesto + gasto;
+  const porcentajeGastado = presupuestoTotal > 0
+    ? ((gasto / presupuestoTotal) * 100).toFixed(1)
+    : "0";
 
   return (
-    <div className={styles.container}>
-      {/* SIDEBAR ANALÍTICO */}
-      <aside className={styles.sidebar}>
-        <div className={styles.sideHeader}>
-          <h2>BI ANALYTICS</h2>
-          <p>SISTEMA DE COMPRAS V1.0</p>
+    <div className={styles.container} style={{ flexDirection: 'column', overflowY: 'auto', gap: '2rem', padding: '2rem' }}>
+
+      {/* TARJETAS DE DINERO */}
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(300px, 1fr))', gap: '1.5rem' }}>
+        <div className={styles.chartCard} style={{ borderTop: '4px solid #00ff41' }}>
+          <small style={{ color: '#666' }}>PRESUPUESTO DISPONIBLE</small>
+          <h2 style={{ fontSize: '2.5rem', color: '#00ff41', margin: '0.5rem 0' }}>
+            ${presupuesto.toLocaleString('es-MX')}
+          </h2>
+          <div style={{ width: '100%', height: '6px', background: '#1a1a1a', borderRadius: '10px' }}>
+            <div style={{ width: `${100 - parseFloat(porcentajeGastado)}%`, height: '100%', background: '#00ff41', boxShadow: '0 0 10px #00ff41' }} />
+          </div>
         </div>
 
-        <div className={styles.filterBox}>
-          <label>ETAPA DEL FLUJO</label>
-          <select value={filtroStatus} onChange={(e) => setFiltroStatus(e.target.value)}>
-            <option value="TODOS">TODOS LOS REGISTROS</option>
-            {data && Object.keys(data.porStatus).map(s => (
-              <option key={s} value={s}>{s} ({data.porStatus[s]})</option>
-            ))}
-          </select>
+        <div className={styles.chartCard} style={{ borderTop: '4px solid #ff0080' }}>
+          <small style={{ color: '#666' }}>GASTO REALIZADO</small>
+          <h2 style={{ fontSize: '2.5rem', color: '#ff0080', margin: '0.5rem 0' }}>
+            ${gasto.toLocaleString('es-MX')}
+          </h2>
+          <span style={{ fontSize: '12px', color: '#ff0080' }}>{porcentajeGastado}% consumido</span>
         </div>
+      </div>
 
-        <div className={styles.miniChart}>
-          <ResponsiveContainer width="100%" height={180}>
-            <PieChart>
-              <Pie
-                data={Object.entries(data.porStatus).map(([name, value]) => ({ name, value }))}
-                innerRadius={55}
-                outerRadius={75}
-                dataKey="value"
-                stroke="none"
-              >
-                {Object.keys(data.porStatus).map((key, i) => (
-                  <Cell key={i} fill={STATUS_COLORS[key] || '#333'} />
+      {/* ESTADO DEL FLUJO */}
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(140px, 1fr))', gap: '1rem' }}>
+        {Object.entries(secciones).map(([key, val]: any) => (
+          <div key={key} className={styles.miniCard} style={{ textAlign: 'center', border: val > 0 ? '1px solid #0070f3' : '1px solid #1a1a1a' }}>
+            <span style={{ fontSize: '10px', color: '#444' }}>{key}</span>
+            <div style={{ fontSize: '22px', fontWeight: 'bold', color: val > 0 ? '#0070f3' : '#333' }}>{val}</div>
+          </div>
+        ))}
+      </div>
+
+      {/* GRÁFICA Y BOTÓN */}
+      <div style={{ display: 'grid', gridTemplateColumns: '2fr 1fr', gap: '2rem' }}>
+        <div className={styles.chartCard} style={{ height: '350px' }}>
+          <h3 style={{fontSize: '12px', marginBottom: '1rem'}}>HISTORIAL DE COMPRAS (Últimos 10 folios)</h3>
+          <ResponsiveContainer width="100%" height="90%">
+            <BarChart data={grafico}>
+              <CartesianGrid strokeDasharray="3 3" stroke="#111" vertical={false} />
+              <XAxis dataKey="name" stroke="#444" fontSize={10} />
+              <YAxis stroke="#444" fontSize={10} />
+              <Tooltip contentStyle={{ background: '#000', border: '1px solid #222' }} />
+              <Bar dataKey="gasto" radius={[5, 5, 0, 0]}>
+                {grafico.map((_: any, index: number) => (
+                  <Cell key={`cell-${index}`} fill={index % 2 === 0 ? '#0070f3' : '#7928ca'} />
                 ))}
-              </Pie>
-              <Tooltip contentStyle={{background: '#111', border: '1px solid #333', fontSize: '12px'}} />
-            </PieChart>
+              </Bar>
+            </BarChart>
           </ResponsiveContainer>
-          <div className={styles.chartLegend}>DISTRIBUCIÓN OPERATIVA</div>
         </div>
-      </aside>
 
-      {/* PANEL PRINCIPAL */}
-      <main className={styles.main}>
-        {/* CARDS KPI */}
-        <header className={styles.kpiGrid}>
-          <div className={styles.kpiCard}>
-            <span className={styles.kpiLabel}>PRESUPUESTO DISPONIBLE</span>
-            <h3 className={styles.valBlue}>${data.stats.presupuestoDisponible.toLocaleString()}</h3>
+        <div className={styles.chartCard} style={{ display: 'flex', flexDirection: 'column', justifyContent: 'center', alignItems: 'center', gap: '1rem' }}>
+          <div style={{ fontSize: '3rem' }}>📁</div>
+          <div style={{ textAlign: 'center' }}>
+            <h4 style={{ margin: 0 }}>Historial General</h4>
+            <p style={{ fontSize: '11px', color: '#555' }}>Auditoría y trazabilidad completa</p>
           </div>
-          <div className={styles.kpiCard}>
-            <span className={styles.kpiLabel}>INVERSIÓN EJECUTADA</span>
-            <h3 className={styles.valRed}>${data.stats.gastoTotal.toLocaleString()}</h3>
-          </div>
-          <div className={styles.kpiCard}>
-            <span className={styles.kpiLabel}>FLUJO DE SOLICITUDES</span>
-            <h3>{data.stats.totalTickets} <small>unidades</small></h3>
-          </div>
-        </header>
-
-        {/* GRÁFICA DE GASTOS */}
-        <section className={styles.chartSection}>
-          <div className={styles.sectionHeader}>
-            <h3>HISTÓRICO DE GASTOS (PAGADOS)</h3>
-          </div>
-          <div className={styles.chartContainer}>
-            <ResponsiveContainer width="100%" height={300}>
-              <AreaChart data={data.gastosHistorial}>
-                <defs>
-                  <linearGradient id="colorGasto" x1="0" y1="0" x2="0" y2="1">
-                    <stop offset="5%" stopColor="#0070f3" stopOpacity={0.3}/>
-                    <stop offset="95%" stopColor="#0070f3" stopOpacity={0}/>
-                  </linearGradient>
-                </defs>
-                <CartesianGrid strokeDasharray="3 3" stroke="#1a1a1a" vertical={false} />
-                <XAxis dataKey="fecha" stroke="#444" fontSize={11} tickLine={false} axisLine={false} />
-                <YAxis stroke="#444" fontSize={11} tickLine={false} axisLine={false} tickFormatter={(v) => `$${v/1000}k`} />
-                <Tooltip
-                  contentStyle={{background: '#000', border: '1px solid #222', borderRadius: '8px'}}
-                  itemStyle={{color: '#0070f3'}}
-                />
-                <Area
-                  type="monotone"
-                  dataKey="monto"
-                  stroke="#0070f3"
-                  fillOpacity={1}
-                  fill="url(#colorGasto)"
-                  strokeWidth={3}
-                />
-              </AreaChart>
-            </ResponsiveContainer>
-          </div>
-        </section>
-
-        {/* TABLA DE REGISTROS */}
-        <section className={styles.tableSection}>
-          <table className={styles.table}>
-            <thead>
-              <tr>
-                <th>FOLIO</th>
-                <th>EMPRESA</th>
-                <th>MONTO FINAL</th>
-                <th>PRIORIDAD</th>
-                <th>STATUS</th>
-              </tr>
-            </thead>
-            <tbody>
-              {solicitudesFiltradas.map((sol: any) => (
-                <tr key={sol.id} onClick={() => verTrazabilidad(sol.id)} className={styles.tableRow}>
-                  <td className={styles.folioCol}>{sol.folio}</td>
-                  <td>{sol.empresa?.nombre || 'S/E'}</td>
-                  <td className={styles.montoCol}>${(sol.montoFinal || 0).toLocaleString()}</td>
-                  <td><div className={styles.priorityDot} style={{background: `var(--${sol.prioridad?.toLowerCase()})`}}></div></td>
-                  <td>
-                    <span className={styles.statusBadge} style={{borderColor: STATUS_COLORS[sol.status], color: STATUS_COLORS[sol.status]}}>
-                      {sol.status}
-                    </span>
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </section>
-      </main>
-
-      {/* OVERLAY DE TRAZABILIDAD */}
-      {detallada && (
-        <div className={styles.overlay} onClick={() => setDetallada(null)}>
-          <div className={styles.drawer} onClick={e => e.stopPropagation()}>
-            <button className={styles.closeBtn} onClick={() => setDetallada(null)}>×</button>
-            <div className={styles.drawerHeader}>
-              <h2>TRAZABILIDAD</h2>
-              <p>{detallada.folio} | {detallada.empresa?.nombre}</p>
-            </div>
-
-            <div className={styles.timeline}>
-              {detallada.timeline?.map((t: any, i: number) => (
-                <div key={i} className={styles.timeEntry}>
-                  <div className={styles.timeDot} style={{background: t.color, boxShadow: `0 0 8px ${t.color}`}}></div>
-                  <div className={styles.timeBody}>
-                    <div className={styles.timeHeader}>
-                      <strong>{t.evento}</strong>
-                      <span>{new Date(t.fecha).toLocaleDateString()}</span>
-                    </div>
-                    <p>{t.detalle}</p>
-                  </div>
-                </div>
-              ))}
-            </div>
-          </div>
+          <button
+            onClick={alVerHistorial}
+            className={styles.btnNavHistorial}
+            style={{ width: '100%', background: '#0070f3', color: '#fff', border: 'none', padding: '12px', borderRadius: '8px', cursor: 'pointer', fontWeight: 'bold' }}
+          >
+            VER TODO EL REGISTRO
+          </button>
         </div>
-      )}
+      </div>
     </div>
   );
 }

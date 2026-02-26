@@ -1,91 +1,88 @@
-"use client";
+'use client';
 import { useState, useEffect } from 'react';
-import styles from './Recepcion.module.css';
+import styles from './recepcion.module.css';
 
 export default function Recepcion() {
-  const [solicitudes, setSolicitudes] = useState([]);
+  const [pendientes, setPendientes] = useState<any[]>([]);
   const [seleccionada, setSeleccionada] = useState<any>(null);
+  const [form, setForm] = useState({ nombre: '', apellidoPaterno: '', apellidoMaterno: '' });
 
-  useEffect(() => {
-    cargarRecepcion();
-  }, []);
-
-  const cargarRecepcion = async () => {
-    const res = await fetch('http://localhost:3000/solicitudes');
-    const data = await res.json();
-    setSolicitudes(data.filter((s: any) => s.status === 'RECEPCION'));
+  const cargarPendientes = () => {
+    fetch('http://localhost:3000/recepcion/pendientes')
+      .then(res => res.json())
+      .then(data => setPendientes(Array.isArray(data) ? data : []));
   };
 
-  const finalizarCiclo = async (e: any) => {
-    e.preventDefault();
-    const formData = new FormData(e.target);
+  useEffect(() => { cargarPendientes(); }, []);
 
-    const updateData = {
-      status: 'ENTREGADO', // Status final para el historial
-      nombreRecibe: formData.get('nombre'),
-      paternoRecibe: formData.get('paterno'),
-      maternoRecibe: formData.get('materno'),
-      fechaRecepcion: new Date()
-    };
+  const handleEntregar = async () => {
+    if (!form.nombre || !form.apellidoPaterno) return alert("Por favor llene los campos obligatorios");
 
-    const res = await fetch(`http://localhost:3000/solicitudes/${seleccionada.id}`, {
-      method: 'PATCH',
+    const res = await fetch(`http://localhost:3000/recepcion/${seleccionada.id}/entregar`, {
+      method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(updateData),
+      body: JSON.stringify(form)
     });
 
     if (res.ok) {
-      alert("¡CICLO COMPLETADO! El registro ha sido guardado en el historial.");
+      alert("✅ Orden entregada con éxito.");
       setSeleccionada(null);
-      cargarRecepcion();
+      setForm({ nombre: '', apellidoPaterno: '', apellidoMaterno: '' });
+      cargarPendientes();
     }
   };
 
   return (
     <div className={styles.container}>
-      <h1 className={styles.neonText}>Confirmación de Recepción</h1>
-
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
-        {/* LISTA DE ESPERA */}
-        <div className={styles.listSide}>
-          <h2 className="text-sky-400 mb-4 font-bold text-sm uppercase">Paquetes por Recibir</h2>
-          {solicitudes.map((s: any) => (
+      <aside className={styles.sidebar}>
+        <h2 className={styles.azulClaro} style={{letterSpacing: '3px', fontSize: '14px'}}>ENTREGAS PENDIENTES</h2>
+        <div style={{marginTop: '2rem'}}>
+          {pendientes.map(s => (
             <div
               key={s.id}
-              className={`${styles.solCard} ${seleccionada?.id === s.id ? styles.active : ''}`}
+              className={`${styles.card} ${seleccionada?.id === s.id ? styles.cardActive : ''}`}
               onClick={() => setSeleccionada(s)}
             >
-              <p className="font-bold">{s.folio}</p>
-              <p className="text-xs italic">{s.concepto}</p>
+              <strong className={styles.azulClaro}>#{s.folio}</strong>
+              <p style={{margin: '5px 0', fontSize: '13px'}}>{s.area?.nombre}</p>
             </div>
           ))}
         </div>
+      </aside>
 
-        {/* FORMULARIO DE ENTREGA */}
-        <div>
-          {seleccionada ? (
-            <form onSubmit={finalizarCiclo} className={styles.glassForm}>
-              <h2 className="text-lg font-bold mb-4 text-[#00ff41]">DATOS DE QUIEN RECIBE</h2>
-              <div className="space-y-4">
-                <input name="nombre" placeholder="Nombre(s)" className={styles.input} required />
-                <input name="paterno" placeholder="Apellido Paterno" className={styles.input} required />
-                <input name="materno" placeholder="Apellido Materno" className={styles.input} required />
+      <main className={styles.main}>
+        {seleccionada ? (
+          <div className={styles.formulario}>
+            <h1 className={styles.azulClaro}>REGISTRO DE SALIDA</h1>
+            <p style={{color: '#555'}}>Confirmar entrega física del material comprado.</p>
 
-                <div className={styles.infoBox}>
-                  <p className="text-[10px] text-gray-500 uppercase">Detalle del Producto</p>
-                  <p className="text-sm">{seleccionada.concepto} x {seleccionada.cantidad}</p>
-                </div>
-
-                <button type="submit" className={styles.btnFinalizar}>
-                  CONCLUIR Y ARCHIVAR
-                </button>
+            <div className={styles.gridForm}>
+              <div className={styles.field}>
+                <label>Nombre Completo</label>
+                <input value={form.nombre} onChange={e => setForm({...form, nombre: e.target.value})} placeholder="Quien recibe..." />
               </div>
-            </form>
-          ) : (
-            <div className={styles.emptyState}>Selecciona un folio para registrar la entrega</div>
-          )}
-        </div>
-      </div>
+              <div style={{display: 'flex', gap: '15px'}}>
+                <div className={styles.field} style={{flex: 1}}>
+                  <label>Apellido Paterno</label>
+                  <input value={form.apellidoPaterno} onChange={e => setForm({...form, apellidoPaterno: e.target.value})} />
+                </div>
+                <div className={styles.field} style={{flex: 1}}>
+                  <label>Apellido Materno</label>
+                  <input value={form.apellidoMaterno} onChange={e => setForm({...form, apellidoMaterno: e.target.value})} />
+                </div>
+              </div>
+            </div>
+
+            <button className={styles.btnAceptar} onClick={handleEntregar}>
+              FINALIZAR Y MARCAR COMO ENTREGADO
+            </button>
+          </div>
+        ) : (
+          <div style={{textAlign: 'center', marginTop: '15%', opacity: 0.3}}>
+            <h2 style={{fontSize: '3rem'}}>ESPERANDO SELECCIÓN</h2>
+          </div>
+        )}
+      </main>
     </div>
   );
 }

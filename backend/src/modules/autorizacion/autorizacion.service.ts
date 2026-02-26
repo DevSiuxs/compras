@@ -6,54 +6,40 @@ import { DecidirCotizacionDto } from './dto/decidir-cotizacion.dto';
 export class AutorizarService {
   constructor(private prisma: PrismaService) {}
 
-async listarPendientes() {
-  return await this.prisma.solicitud.findMany({
-    where: {
-      status: {
-        in: ['AUTORIZAR', 'PENDIENTE_AJUSTE'] // Trae las nuevas y las que tienen mensaje de compras
-      }
-    },
-    include: {
-      empresa: true,
-      items: { include: { unidad: true } },
-      cotizaciones: true,
-      mensajes: true, // <--- ESTA ES LA LÍNEA MÁGICA QUE TE FALTABA
-    },
-    orderBy: { fechaCreacion: 'asc' },
-  });
-}
+  async listarPendientes() {
+    return await this.prisma.solicitud.findMany({
+      where: { status: { in: ['AUTORIZAR', 'PENDIENTE_AJUSTE'] } },
+      include: {
+        empresa: true,
+        items: { include: { unidad: true } },
+        cotizaciones: true,
+        mensajes: { orderBy: { fecha: 'desc' } },
+      },
+      orderBy: { fechaCreacion: 'asc' },
+    });
+  }
+
   async obtenerPresupuesto() {
     const p = await this.prisma.configuracionGlobal.findFirst();
     return p || { presupuestoGlobal: 0 };
   }
 
   async actualizarPresupuesto(monto: number) {
-    const p = await this.prisma.configuracionGlobal.findFirst();
-    if (p) {
+    const config = await this.prisma.configuracionGlobal.findFirst();
+    if (config) {
       return this.prisma.configuracionGlobal.update({
-        where: { id: p.id },
+        where: { id: config.id },
         data: { presupuestoGlobal: monto },
       });
-    } else {
-      return this.prisma.configuracionGlobal.create({
-        data: { id: 1, presupuestoGlobal: monto },
-      });
     }
+    return this.prisma.configuracionGlobal.create({
+      data: { id: 1, presupuestoGlobal: monto },
+    });
   }
 
   async autorizarPropuesta(solicitudId: number, dto: DecidirCotizacionDto) {
-    const cotizacion = await this.prisma.cotizacion.findUnique({
-      where: { id: dto.cotizacionId }
-    });
-
-    const config = await this.prisma.configuracionGlobal.findFirst();
-    const disponible = config?.presupuestoGlobal || 0;
-
-    if (!cotizacion || cotizacion.monto > disponible) {
-      throw new BadRequestException('Presupuesto insuficiente.');
-    }
-
     return this.prisma.$transaction(async (tx) => {
+      // Marcar cotización elegida
       await tx.cotizacion.updateMany({
         where: { solicitudId },
         data: { seleccionada: false }
@@ -64,16 +50,14 @@ async listarPendientes() {
         data: { seleccionada: true }
       });
 
-      // Si viene nuevaPrioridad (el color elegido), lo seteamos y reseteamos fecha
-      const dataUpdate: any = {
-        status: 'COMPRAR',
-        prioridad: dto.nuevaPrioridad || 'AZUL',
-        fechaResetColor: new Date()
-      };
-
+      // Pasar a compras manteniendo el color manual si se eligió
       return tx.solicitud.update({
         where: { id: solicitudId },
-        data: dataUpdate
+        data: {
+          status: 'COMPRAR',
+          prioridad: dto.nuevaPrioridad || undefined,
+          fechaResetColor: dto.nuevaPrioridad ? new Date() : undefined
+        }
       });
     });
   }
