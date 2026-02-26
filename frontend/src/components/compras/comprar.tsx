@@ -1,67 +1,112 @@
 'use client';
-import { useState, useEffect } from 'react';
+
+import { useState, useEffect, useCallback } from 'react';
+import { ENDPOINTS, getHeaders } from '@/config/apiConfig';
+import {
+  SolicitudAutorizable as SolicitudCompra,
+  PrioridadColor
+} from '@/types';
+import { calcularColorPrioridad } from '@/utils/semaforo';
 import styles from './comprar.module.css';
 
+// Mapeo numérico para ordenar por urgencia visualmente
+const PRIORIDAD_VALOR: Record<PrioridadColor, number> = {
+  ROJO: 5,
+  NARANJA: 4,
+  AMARILLO: 3,
+  VERDE: 2,
+  AZUL: 1
+};
+
 export default function Comprar() {
-  const [pendientes, setPendientes] = useState<any[]>([]);
-  const [presupuesto, setPresupuesto] = useState(0);
-  const [seleccionada, setSeleccionada] = useState<any>(null);
-  const [mostrarModalMensaje, setMostrarModalMensaje] = useState(false);
-  const [motivoMensaje, setMotivoMensaje] = useState('');
+  const [pendientes, setPendientes] = useState<SolicitudCompra[]>([]);
+  const [presupuesto, setPresupuesto] = useState<number>(0);
+  const [seleccionada, setSeleccionada] = useState<SolicitudCompra | null>(null);
+  const [mostrarModalMensaje, setMostrarModalMensaje] = useState<boolean>(false);
+  const [motivoMensaje, setMotivoMensaje] = useState<string>('');
 
-  // Prioridad: ROJO(5) > NARANJA(4) > AMARILLO(3) > VERDE(2) > AZUL(1)
-  const COLORES_PRIORIDAD: any = { ROJO: 5, NARANJA: 4, AMARILLO: 3, VERDE: 2, AZUL: 1 };
-
-  const cargarDatos = async () => {
+  /**
+   * Carga de datos iniciales: Presupuesto Global y Solicitudes en cola de compra
+   */
+  const cargarDatos = useCallback(async () => {
     try {
-      const resP = await fetch('http://localhost:3000/autorizacion/presupuesto');
+      const headers = getHeaders();
+
+      // 1. Obtener Presupuesto Global
+      const resP = await fetch(ENDPOINTS.AUTORIZACION.PRESUPUESTO, { headers });
       const dataP = await resP.json();
       setPresupuesto(dataP?.presupuestoGlobal || 0);
 
-      const resS = await fetch('http://localhost:3000/compras/pendientes');
-      const dataS = await resS.json();
+      // 2. Obtener Solicitudes Pendientes de Compra
+      const resS = await fetch(ENDPOINTS.COMPRAS.PENDIENTES, { headers });
+      const dataS: SolicitudCompra[] = await resS.json();
 
-      const ordenados = dataS.sort((a: any, b: any) => {
-        const pA = COLORES_PRIORIDAD[a.prioridad] || 0;
-        const pB = COLORES_PRIORIDAD[b.prioridad] || 0;
+      // Ordenar por prioridad (Color calculado) y luego por fecha
+      const ordenados = dataS.sort((a, b) => {
+        const colorA = calcularColorPrioridad(a.fechaResetColor).color;
+        const colorB = calcularColorPrioridad(b.fechaResetColor).color;
+
+        const pA = PRIORIDAD_VALOR[colorA] || 0;
+        const pB = PRIORIDAD_VALOR[colorB] || 0;
+
         if (pB !== pA) return pB - pA;
         return new Date(a.fechaCreacion).getTime() - new Date(b.fechaCreacion).getTime();
       });
+
       setPendientes(ordenados);
-    } catch (e) { console.error(e); }
-  };
+    } catch (e) {
+      console.error("Error al sincronizar con el servidor de compras:", e);
+    }
+  }, []);
 
-  useEffect(() => { cargarDatos(); }, []);
+  useEffect(() => {
+    cargarDatos();
+  }, [cargarDatos]);
 
+  /**
+   * Ejecuta la transacción de compra en el backend
+   */
   const handleComprar = async (id: number) => {
-    // API ejecutando compra (resta saldo en el backend)
-    const res = await fetch(`http://localhost:3000/compras/${id}/ejecutar`, { method: 'POST' });
+    const res = await fetch(ENDPOINTS.COMPRAS.EJECUTAR(id), {
+      method: 'POST',
+      headers: getHeaders()
+    });
+
     if (res.ok) {
       setSeleccionada(null);
       cargarDatos();
     } else {
       const err = await res.json();
-      alert(err.message || "Error al procesar el pago");
+      alert(err.message || "Error crítico en la dispersión de fondos");
     }
   };
 
+  /**
+   * Notifica al autorizador sobre falta de presupuesto o incidencias
+   */
   const enviarMensaje = async () => {
-    if (!motivoMensaje) return;
-    await fetch(`http://localhost:3000/compras/${seleccionada.id}/notificar-presupuesto`, {
+    if (!motivoMensaje || !seleccionada) return;
+
+    const res = await fetch(ENDPOINTS.COMPRAS.NOTIFICAR(seleccionada.id), {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: getHeaders(),
       body: JSON.stringify({ motivo: motivoMensaje })
     });
-    setMostrarModalMensaje(false);
-    setMotivoMensaje('');
-    setSeleccionada(null);
-    cargarDatos();
+
+    if (res.ok) {
+      setMostrarModalMensaje(false);
+      setMotivoMensaje('');
+      setSeleccionada(null);
+      cargarDatos();
+    }
   };
 
-  const cotizacion = seleccionada?.cotizaciones?.find((c: any) => c.seleccionada);
+  // Identificar la cotización que fue marcada como "ganadora" en el paso de Autorizar
+  const cotizacionGanadora = seleccionada?.cotizaciones?.find(c => c.seleccionada);
 
   return (
     <div className={styles.container}>
+      {/* Barra Lateral: Lista de Solicitudes */}
       <aside className={styles.sidebar}>
         <div className={styles.sidebarHeader}>
           <p className={styles.miniTag}>PAGOS PENDIENTES</p>
@@ -69,90 +114,105 @@ export default function Comprar() {
         </div>
 
         <div className={styles.budgetCard}>
-          <span className={styles.label}>SALDO GLOBAL</span>
-          <p className={styles.blueValue}>${presupuesto.toLocaleString()}</p>
+          <span className={styles.label}>SALDO DISPONIBLE GLOBAL</span>
+          <p className={styles.blueValue}>${presupuesto.toLocaleString('es-MX')}</p>
         </div>
 
         <div className={styles.scrollArea}>
-          {pendientes.map(sol => (
-            <div
-              key={sol.id}
-              className={`${styles.solCard} ${seleccionada?.id === sol.id ? styles.activeCard : ''}`}
-              onClick={() => setSeleccionada(sol)}
-            >
-              <div className={styles.cardInfo}>
-                <span className={styles.folio}>#{sol.folio}</span>
-                <p className={styles.empresa}>{sol.empresa?.nombre}</p>
+          {pendientes.map(sol => {
+            const { color } = calcularColorPrioridad(sol.fechaResetColor);
+            return (
+              <div
+                key={sol.id}
+                className={`${styles.solCard} ${seleccionada?.id === sol.id ? styles.activeCard : ''}`}
+                onClick={() => setSeleccionada(sol)}
+              >
+                <div className={styles.cardInfo}>
+                  <span className={styles.folio}>#{sol.folio}</span>
+                  <p className={styles.empresa}>{sol.empresa?.nombre}</p>
+                </div>
+                {/* El color del punto ahora es dinámico por fecha */}
+                <div className={styles.priorityDot} style={{ background: `var(--${color.toLowerCase()})` }} />
               </div>
-              <div className={styles.priorityDot} style={{ background: `var(--${sol.prioridad?.toLowerCase()})` }} />
-            </div>
-          ))}
+            );
+          })}
         </div>
       </aside>
 
+      {/* Área Principal: Detalle y Ejecución */}
       <main className={styles.mainContent}>
-        {seleccionada && cotizacion ? (
+        {seleccionada && cotizacionGanadora ? (
           <div className={styles.detailView}>
             <header className={styles.detailHeader}>
               <div className={styles.headerInfo}>
-                <div className={styles.priorityLabel} style={{ borderColor: `var(--${seleccionada.prioridad?.toLowerCase()})`, color: `var(--${seleccionada.prioridad?.toLowerCase()})` }}>
-                  URGENCIA: {seleccionada.prioridad}
+                {/* Cálculo dinámico de urgencia para el badge */}
+                <div
+                  className={styles.priorityLabel}
+                  style={{
+                    borderColor: `var(--${calcularColorPrioridad(seleccionada.fechaResetColor).color.toLowerCase()})`,
+                    color: `var(--${calcularColorPrioridad(seleccionada.fechaResetColor).color.toLowerCase()})`
+                  }}
+                >
+                  URGENCIA: {calcularColorPrioridad(seleccionada.fechaResetColor).color} ({calcularColorPrioridad(seleccionada.fechaResetColor).dias} días)
                 </div>
                 <h1>Solicitud #{seleccionada.folio}</h1>
               </div>
               <div className={styles.provInfo}>
                 <span className={styles.label}>PROVEEDOR ADJUDICADO</span>
-                <p>{cotizacion.proveedor}</p>
+                <p>{cotizacionGanadora.proveedor}</p>
               </div>
             </header>
 
             <div className={styles.contentGrid}>
               <section className={styles.itemsSection}>
-                <h3>LISTA DE ARTÍCULOS</h3>
+                <h3>ARTÍCULOS A ADQUIRIR</h3>
                 <div className={styles.tableWrapper}>
-                    <table className={styles.table}>
+                  <table className={styles.table}>
                     <thead>
-                        <tr>
+                      <tr>
                         <th>Cant.</th>
                         <th>Descripción</th>
                         <th>Unidad</th>
-                        </tr>
+                      </tr>
                     </thead>
                     <tbody>
-                        {seleccionada.items?.map((item: any, i: number) => (
-                        <tr key={i}>
-                            <td className={styles.bold}>{item.cantidad}</td>
-                            <td>{item.descripcion}</td>
-                            <td>{item.unidad?.nombre}</td>
+                      {seleccionada.items?.map((item, i) => (
+                        <tr key={item.id || i}>
+                          <td className={styles.bold}>{item.cantidad}</td>
+                          <td>{item.descripcion}</td>
+                          <td>{item.unidad?.nombre}</td>
                         </tr>
-                        ))}
+                      ))}
                     </tbody>
-                    </table>
+                  </table>
                 </div>
               </section>
 
               <section className={styles.paymentSection}>
                 <div className={styles.totalCard}>
                   <span className={styles.label}>MONTO A DISPERSAR</span>
-                  <p className={styles.totalAmount}>${cotizacion.monto.toLocaleString()}</p>
+                  <p className={styles.totalAmount}>${cotizacionGanadora.monto.toLocaleString('es-MX')}</p>
                   <div className={styles.divider} />
-                  <p className={styles.obs}>{cotizacion.observaciones || 'Sin observaciones de autorización'}</p>
+                  <p className={styles.obs}>
+                    <strong>Obs. Autorización:</strong> {cotizacionGanadora.observaciones || 'Sin notas adicionales'}
+                  </p>
                 </div>
 
                 <div className={styles.actions}>
-                  {/* BOTÓN SIEMPRE HABILITADO - SOLO CAMBIA EL TEXTO SEGÚN SALDO */}
                   <button
-                    className={`${styles.btnConfirm} ${cotizacion.monto > presupuesto ? styles.btnWarning : ''}`}
+                    className={`${styles.btnConfirm} ${cotizacionGanadora.monto > presupuesto ? styles.btnWarning : ''}`}
                     onClick={() => handleComprar(seleccionada.id)}
                   >
-                    {cotizacion.monto > presupuesto ? "AUTORIZAR PAGO (SIN SALDO)" : "CONFIRMAR Y PAGAR"}
+                    {cotizacionGanadora.monto > presupuesto
+                      ? "FONDOS INSUFICIENTES (REVISAR)"
+                      : "CONFIRMAR Y PAGAR"}
                   </button>
 
                   <button
                     className={styles.btnMensaje}
                     onClick={() => setMostrarModalMensaje(true)}
                   >
-                    NOTIFICAR INCIDENCIA / FALTA SALDO
+                    SOLICITAR AJUSTE DE PRESUPUESTO
                   </button>
                 </div>
               </section>
@@ -161,24 +221,25 @@ export default function Comprar() {
         ) : (
           <div className={styles.emptyState}>
             <div className={styles.scanline} />
-            <p>TERMINAL DE PAGOS LISTA</p>
+            <p>SISTEMA DE PAGOS ESPERANDO SELECCIÓN</p>
           </div>
         )}
       </main>
 
+      {/* Modal para Notificaciones/Mensajes */}
       {mostrarModalMensaje && (
         <div className={styles.modalOverlay}>
           <div className={styles.modal}>
-            <h3>NOTIFICACIÓN DE COMPRAS</h3>
-            <p className={styles.label}>Motivo del reporte para autorización:</p>
+            <h3>NOTIFICAR A AUTORIZACIÓN</h3>
+            <p className={styles.label}>Describa el motivo del ajuste o incidencia:</p>
             <textarea
               value={motivoMensaje}
               onChange={(e) => setMotivoMensaje(e.target.value)}
-              placeholder="Ej. El proveedor no tiene stock o el presupuesto es insuficiente..."
+              placeholder="Ej. Se requiere ampliación de presupuesto para cubrir impuestos..."
             />
             <div className={styles.modalActions}>
-              <button onClick={enviarMensaje} className={styles.btnSend}>ENVIAR MENSAJE</button>
-              <button onClick={() => setMostrarModalMensaje(false)} className={styles.btnCancel}>VOLVER</button>
+              <button onClick={enviarMensaje} className={styles.btnSend}>ENVIAR REPORTE</button>
+              <button onClick={() => setMostrarModalMensaje(false)} className={styles.btnCancel}>CANCELAR</button>
             </div>
           </div>
         </div>

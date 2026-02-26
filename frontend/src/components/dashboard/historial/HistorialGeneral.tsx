@@ -1,141 +1,114 @@
 'use client';
+
 import { useState, useEffect, useMemo } from 'react';
+import { ENDPOINTS, getHeaders } from '@/config/apiConfig';
+import { SolicitudHistorial, DashboardData } from '@/types';
 import styles from '../Dashboard.module.css';
 
+const STATUS_COLORS: Record<string, string> = {
+  SOLICITADO: '#0070f3',
+  COTIZANDO: '#7928ca',
+  AUTORIZAR: '#ffca28',
+  COMPRAR: '#ff0080',
+  RECIBIDO: '#00ff41',
+  ENTREGADO: '#00ff41',
+  PAGADO: '#00ff41'
+};
+
 export default function HistorialGeneral() {
-  const [solicitudes, setSolicitudes] = useState<any[]>([]);
-  const [detallada, setDetallada] = useState<any>(null);
+  const [solicitudes, setSolicitudes] = useState<SolicitudHistorial[]>([]);
+  const [detallada, setDetallada] = useState<SolicitudHistorial | null>(null);
   const [loading, setLoading] = useState(true);
 
-  // ESTADOS PARA LOS FILTROS
+  // Filtros
   const [filtroFecha, setFiltroFecha] = useState('');
-  const [filtroFolio, setFiltroFolio] = useState(''); // Filtro por número de folio
-
-  const STATUS_COLORS: any = {
-    SOLICITADO: '#0070f3',
-    COTIZANDO: '#7928ca',
-    AUTORIZAR: '#ffca28',
-    COMPRAR: '#ff0080',
-    RECIBIDO: '#00ff41',
-    ENTREGADO: '#00ff41',
-    PAGADO: '#00ff41'
-  };
+  const [filtroFolio, setFiltroFolio] = useState('');
 
   useEffect(() => {
-    // Llamamos al endpoint. IMPORTANTE: El service debe devolver 'solicitudes' o 'recientes'
-    fetch('http://localhost:3000/reportes/dashboard')
+    fetch(ENDPOINTS.REPORTES.DASHBOARD, { headers: getHeaders() })
       .then(res => res.json())
-      .then(data => {
-        // Ajuste de seguridad para encontrar la lista de solicitudes
-        const lista = data.solicitudes || data.recientes || [];
-        setSolicitudes(lista);
+      .then((data: DashboardData) => {
+        setSolicitudes(data.solicitudes || []);
         setLoading(false);
       })
-      .catch(err => {
-        console.error("Error:", err);
-        setLoading(false);
-      });
+      .catch(() => setLoading(false));
   }, []);
 
-  const verTrazabilidad = (id: number) => {
-    fetch(`http://localhost:3000/reportes/detalle/${id}`)
-      .then(res => res.json())
-      .then(d => setDetallada(d));
+  const fetchTrazabilidad = async (sol: SolicitudHistorial) => {
+    try {
+      const res = await fetch(ENDPOINTS.REPORTES.TRAZABILIDAD(sol.id), { headers: getHeaders() });
+      const data = await res.json();
+      setDetallada(data);
+    } catch (error) {
+      console.error("Error al obtener trazabilidad:", error);
+    }
   };
 
-  // LÓGICA DE FILTRADO: Por fecha y por Número de Folio
-  const solicitudesFiltradas = useMemo(() => {
-    return solicitudes.filter((s: any) => {
-      const coincideFecha = filtroFecha ? s.fechaCreacion.includes(filtroFecha) : true;
-      // Filtra si el folio contiene el número que escribas (ej: "001")
-      const coincideFolio = filtroFolio ? s.folio.toLowerCase().includes(filtroFolio.toLowerCase()) : true;
-      return coincideFecha && coincideFolio;
+  const listaFiltrada = useMemo(() => {
+    return solicitudes.filter(s => {
+      const matchFolio = s.folio.toLowerCase().includes(filtroFolio.toLowerCase());
+      const matchFecha = filtroFecha ? s.fechaCreacion.startsWith(filtroFecha) : true;
+      return matchFolio && matchFecha;
     });
-  }, [solicitudes, filtroFecha, filtroFolio]);
+  }, [solicitudes, filtroFolio, filtroFecha]);
 
-  if (loading) return <div className={styles.loading}>Sincronizando Historial...</div>;
+  if (loading) return <div className={styles.loading}>Cargando historial...</div>;
 
   return (
-    <div className={styles.main} style={{ padding: '2rem' }}>
-      <header style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '2rem' }}>
-        <div>
-          <h2 style={{ color: '#0070f3', letterSpacing: '2px', fontSize: '14px', margin: 0 }}>
-            HISTORIAL DE OPERACIONES
-          </h2>
-          <p style={{ color: '#444', fontSize: '11px' }}>{solicitudesFiltradas.length} resultados encontrados</p>
-        </div>
-
-        {/* CONTENEDOR DE FILTROS */}
-        <div style={{ display: 'flex', gap: '1rem' }}>
-          <div className={styles.filterGroup}>
-            <input
-              type="date"
-              value={filtroFecha}
-              onChange={(e) => setFiltroFecha(e.target.value)}
-              style={{ background: '#0d0d0d', border: '1px solid #222', color: '#fff', padding: '0.6rem', borderRadius: '8px' }}
-            />
-          </div>
-          <div className={styles.filterGroup}>
-            <input
-              type="text"
-              placeholder="Buscar Folio (ej: 001)"
-              value={filtroFolio}
-              onChange={(e) => setFiltroFolio(e.target.value)}
-              style={{ background: '#0d0d0d', border: '1px solid #222', color: '#fff', padding: '0.6rem', borderRadius: '8px', width: '200px' }}
-            />
-          </div>
+    <div className={styles.container}>
+      <header className={styles.header}>
+        <h1 className={styles.azulClaro}>HISTORIAL DE OPERACIONES</h1>
+        <div className={styles.filtrosBar}>
+          <input
+            type="text"
+            placeholder="Buscar por Folio..."
+            value={filtroFolio}
+            onChange={e => setFiltroFolio(e.target.value)}
+            className={styles.inputFiltro}
+          />
+          <input
+            type="date"
+            value={filtroFecha}
+            onChange={e => setFiltroFecha(e.target.value)}
+            className={styles.inputFiltro}
+          />
         </div>
       </header>
 
-      <section className={styles.tableCard} style={{ background: '#0d0d0d', borderRadius: '15px', border: '1px solid #1a1a1a', overflow: 'hidden' }}>
-        <table className={styles.table}>
+      <section className={styles.tableCard}>
+        <table className={styles.tabla}>
           <thead>
-            <tr style={{ background: '#111' }}>
-              <th style={{ padding: '1.2rem' }}>FOLIO</th>
-              <th>EMPRESA</th>
-              <th>FECHA</th>
-              <th>ESTADO</th>
-              <th style={{ textAlign: 'right' }}>MONTO</th>
-              <th style={{ textAlign: 'center' }}>ACCIONES</th>
+            <tr>
+              <th>Folio</th>
+              <th>Empresa</th>
+              <th>Fecha Creación</th>
+              <th>Status</th>
+              <th>Monto Final</th>
+              <th>Acción</th>
             </tr>
           </thead>
           <tbody>
-            {solicitudesFiltradas.length > 0 ? (
-              solicitudesFiltradas.map((sol: any) => (
-                <tr key={sol.id} className={styles.row}>
-                  <td className={styles.folio} style={{ fontWeight: 'bold', color: '#0070f3' }}>{sol.folio}</td>
-                  <td>{sol.empresa?.nombre || 'N/A'}</td>
-                  <td className={styles.date}>{new Date(sol.fechaCreacion).toLocaleDateString()}</td>
-                  <td>
-                    <span
-                      className={styles.statusBadge}
-                      style={{
-                        background: `${STATUS_COLORS[sol.status] || '#222'}22`,
-                        color: STATUS_COLORS[sol.status] || '#888',
-                        borderColor: STATUS_COLORS[sol.status] || '#333',
-                        padding: '4px 8px', borderRadius: '5px', fontSize: '10px', border: '1px solid'
-                      }}
-                    >
-                      {sol.status}
-                    </span>
-                  </td>
-                  <td className={styles.price} style={{ textAlign: 'right', fontWeight: 'bold' }}>
-                    ${(sol.montoFinal || 0).toLocaleString()}
-                  </td>
-                  <td style={{ textAlign: 'center' }}>
-                    <button className={styles.btnTrace} onClick={() => verTrazabilidad(sol.id)}>
-                      Detalles
-                    </button>
-                  </td>
-                </tr>
-              ))
-            ) : (
-              <tr>
-                <td colSpan={6} style={{ textAlign: 'center', padding: '3rem', color: '#444' }}>
-                  No se encontraron registros con esos filtros.
+            {listaFiltrada.map(sol => (
+              <tr key={sol.id}>
+                <td className={styles.bold}>{sol.folio}</td>
+                <td>{sol.empresa?.nombre}</td>
+                <td>{new Date(sol.fechaCreacion).toLocaleDateString()}</td>
+                <td>
+                  <span
+                    className={styles.statusBadge}
+                    style={{ backgroundColor: `${STATUS_COLORS[sol.status]}22`, color: STATUS_COLORS[sol.status] }}
+                  >
+                    {sol.status}
+                  </span>
+                </td>
+                <td>{sol.montoFinal ? `$${sol.montoFinal.toLocaleString()}` : '---'}</td>
+                <td>
+                  <button className={styles.btnTrazabilidad} onClick={() => fetchTrazabilidad(sol)}>
+                    Ver Trazabilidad
+                  </button>
                 </td>
               </tr>
-            )}
+            ))}
           </tbody>
         </table>
       </section>
@@ -145,11 +118,11 @@ export default function HistorialGeneral() {
         <div className={styles.overlay} onClick={() => setDetallada(null)}>
           <div className={styles.drawer} onClick={e => e.stopPropagation()}>
             <button className={styles.closeBtn} onClick={() => setDetallada(null)}>×</button>
-            <h2 style={{ color: '#0070f3' }}>TRAZABILIDAD</h2>
-            <p style={{ marginBottom: '2rem' }}>{detallada.folio} | {detallada.empresa?.nombre}</p>
+            <h2 style={{ color: '#0070f3' }}>LÍNEA DE TIEMPO</h2>
+            <p className={styles.drawerSub}>{detallada.folio} | {detallada.empresa?.nombre}</p>
 
             <div className={styles.timeline}>
-              {detallada.timeline?.map((t: any, i: number) => (
+              {detallada.timeline?.map((t, i) => (
                 <div key={i} className={styles.timeEntry}>
                   <div className={styles.timeDot} style={{ background: t.color }}></div>
                   <div className={styles.timeBody}>
@@ -157,7 +130,7 @@ export default function HistorialGeneral() {
                       <strong>{t.evento}</strong>
                       <span>{new Date(t.fecha).toLocaleDateString()}</span>
                     </div>
-                    <p style={{ fontSize: '12px', color: '#888' }}>{t.detalle}</p>
+                    <p className={styles.timeDetail}>{t.detalle}</p>
                   </div>
                 </div>
               ))}

@@ -1,74 +1,137 @@
 'use client';
-import { useState, useEffect } from 'react';
+
+import { useState, useEffect, useCallback } from 'react';
+import { ENDPOINTS, getHeaders } from '@/config/apiConfig';
+import { SolicitudRecepcion, FinalizarRecepcionDTO } from '@/types';
 import styles from './recepcion.module.css';
 
 export default function Recepcion() {
-  const [pendientes, setPendientes] = useState<any[]>([]);
-  const [seleccionada, setSeleccionada] = useState<any>(null);
-  const [form, setForm] = useState({ nombre: '', apellidoPaterno: '', apellidoMaterno: '' });
+  const [pendientes, setPendientes] = useState<SolicitudRecepcion[]>([]);
+  const [seleccionada, setSeleccionada] = useState<SolicitudRecepcion | null>(null);
+  const [form, setForm] = useState<FinalizarRecepcionDTO>({
+    nombre: '',
+    apellidoPaterno: '',
+    apellidoMaterno: ''
+  });
 
-  const cargarPendientes = () => {
-    fetch('http://localhost:3000/recepcion/pendientes')
-      .then(res => res.json())
-      .then(data => setPendientes(Array.isArray(data) ? data : []));
-  };
+  const cargarPendientes = useCallback(async () => {
+    try {
+      const res = await fetch(ENDPOINTS.RECEPCION.PENDIENTES, {
+        headers: getHeaders()
+      });
+      const data = await res.json();
+      setPendientes(Array.isArray(data) ? data : []);
+    } catch (error) {
+      console.error("Error cargando recepción:", error);
+    }
+  }, []);
 
-  useEffect(() => { cargarPendientes(); }, []);
+  useEffect(() => {
+    cargarPendientes();
+  }, [cargarPendientes]);
 
   const handleEntregar = async () => {
-    if (!form.nombre || !form.apellidoPaterno) return alert("Por favor llene los campos obligatorios");
+    if (!seleccionada) return;
+    if (!form.nombre || !form.apellidoPaterno) {
+      alert("Por favor llene los campos obligatorios del receptor");
+      return;
+    }
 
-    const res = await fetch(`http://localhost:3000/recepcion/${seleccionada.id}/entregar`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(form)
-    });
+    try {
+      const res = await fetch(ENDPOINTS.RECEPCION.ENTREGAR(seleccionada.id), {
+        method: 'POST',
+        headers: getHeaders(),
+        body: JSON.stringify(form)
+      });
 
-    if (res.ok) {
-      alert("✅ Orden entregada con éxito.");
-      setSeleccionada(null);
-      setForm({ nombre: '', apellidoPaterno: '', apellidoMaterno: '' });
-      cargarPendientes();
+      if (res.ok) {
+        alert("✅ Entrega física registrada y folio finalizado.");
+        setSeleccionada(null);
+        setForm({ nombre: '', apellidoPaterno: '', apellidoMaterno: '' });
+        cargarPendientes();
+      } else {
+        const errorData = await res.json();
+        alert(`Error: ${errorData.message}`);
+      }
+    } catch (error) {
+      console.error("Error al procesar entrega:", error);
     }
   };
 
   return (
     <div className={styles.container}>
       <aside className={styles.sidebar}>
-        <h2 className={styles.azulClaro} style={{letterSpacing: '3px', fontSize: '14px'}}>ENTREGAS PENDIENTES</h2>
-        <div style={{marginTop: '2rem'}}>
-          {pendientes.map(s => (
-            <div
-              key={s.id}
-              className={`${styles.card} ${seleccionada?.id === s.id ? styles.cardActive : ''}`}
-              onClick={() => setSeleccionada(s)}
-            >
-              <strong className={styles.azulClaro}>#{s.folio}</strong>
-              <p style={{margin: '5px 0', fontSize: '13px'}}>{s.area?.nombre}</p>
-            </div>
-          ))}
+        <div className={styles.sidebarHeader}>
+          <h2>RECEPCIÓN</h2>
+          <p>Materiales Listos para Entrega</p>
+        </div>
+
+        <div className={styles.scrollArea}>
+          {pendientes.length === 0 ? (
+            <p className={styles.noData}>No hay materiales por entregar</p>
+          ) : (
+            pendientes.map(sol => (
+              <div
+                key={sol.id}
+                className={`${styles.solCard} ${seleccionada?.id === sol.id ? styles.activeCard : ''}`}
+                onClick={() => setSeleccionada(sol)}
+              >
+                <div className={styles.cardMain}>
+                  <span className={styles.folio}>#{sol.folio}</span>
+                  <p className={styles.area}>{sol.area?.nombre}</p>
+                </div>
+                <div className={styles.empresaTag}>{sol.empresa?.nombre}</div>
+              </div>
+            ))
+          )}
         </div>
       </aside>
 
-      <main className={styles.main}>
+      <main className={styles.mainContent}>
         {seleccionada ? (
-          <div className={styles.formulario}>
-            <h1 className={styles.azulClaro}>REGISTRO DE SALIDA</h1>
-            <p style={{color: '#555'}}>Confirmar entrega física del material comprado.</p>
+          <div className={styles.detailView}>
+            <div className={styles.recepcionHeader}>
+              <h1 className={styles.azulClaro}>REGISTRO DE SALIDA</h1>
+              <p>Confirme quién recibe el material físicamente.</p>
+            </div>
+
+            <div className={styles.infoGrid}>
+              <div className={styles.infoBox}>
+                <h3>Resumen de Solicitud</h3>
+                <p><strong>Justificación:</strong> {seleccionada.justificacion}</p>
+                <div className={styles.itemsList}>
+                  {seleccionada.items?.map((item, idx) => (
+                    <div key={idx} className={styles.itemRow}>
+                      {item.cantidad} x {item.descripcion} ({item.unidad?.nombre})
+                    </div>
+                  ))}
+                </div>
+              </div>
+            </div>
 
             <div className={styles.gridForm}>
               <div className={styles.field}>
-                <label>Nombre Completo</label>
-                <input value={form.nombre} onChange={e => setForm({...form, nombre: e.target.value})} placeholder="Quien recibe..." />
+                <label>Nombre de quien recibe</label>
+                <input
+                  value={form.nombre}
+                  onChange={e => setForm({...form, nombre: e.target.value})}
+                  placeholder="Nombre(s)"
+                />
               </div>
-              <div style={{display: 'flex', gap: '15px'}}>
-                <div className={styles.field} style={{flex: 1}}>
+              <div className={styles.flexFields}>
+                <div className={styles.field}>
                   <label>Apellido Paterno</label>
-                  <input value={form.apellidoPaterno} onChange={e => setForm({...form, apellidoPaterno: e.target.value})} />
+                  <input
+                    value={form.apellidoPaterno}
+                    onChange={e => setForm({...form, apellidoPaterno: e.target.value})}
+                  />
                 </div>
-                <div className={styles.field} style={{flex: 1}}>
+                <div className={styles.field}>
                   <label>Apellido Materno</label>
-                  <input value={form.apellidoMaterno} onChange={e => setForm({...form, apellidoMaterno: e.target.value})} />
+                  <input
+                    value={form.apellidoMaterno}
+                    onChange={e => setForm({...form, apellidoMaterno: e.target.value})}
+                  />
                 </div>
               </div>
             </div>
@@ -78,8 +141,8 @@ export default function Recepcion() {
             </button>
           </div>
         ) : (
-          <div style={{textAlign: 'center', marginTop: '15%', opacity: 0.3}}>
-            <h2 style={{fontSize: '3rem'}}>ESPERANDO SELECCIÓN</h2>
+          <div className={styles.emptyState}>
+            <h2 style={{ opacity: 0.3, fontSize: '2.5rem' }}>SELECCIONE UNA ORDEN</h2>
           </div>
         )}
       </main>

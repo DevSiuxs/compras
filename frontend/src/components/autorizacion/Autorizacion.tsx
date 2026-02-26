@@ -1,174 +1,166 @@
 'use client';
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
+import { ENDPOINTS, getHeaders } from '@/config/apiConfig';
+import { SolicitudAutorizable, PrioridadColor } from '@/types';
 import styles from './Autorizacion.module.css';
 
-export default function Autorizar() {
-  const [pendientes, setPendientes] = useState<any[]>([]);
-  const [presupuesto, setPresupuesto] = useState(0);
-  const [seleccionada, setSeleccionada] = useState<any>(null);
+export default function AutorizarPage() {
+  const [pendientes, setPendientes] = useState<SolicitudAutorizable[]>([]);
+  const [presupuesto, setPresupuesto] = useState<number>(0);
+  const [seleccionada, setSeleccionada] = useState<SolicitudAutorizable | null>(null);
   const [nuevoMonto, setNuevoMonto] = useState<string>("");
-  const [colorManual, setColorManual] = useState<string>("AZUL");
-  const [showMsjs, setShowMsjs] = useState(false);
+  const [prioridadManual, setPrioridadManual] = useState<PrioridadColor>("AZUL");
+  const [loading, setLoading] = useState(false);
 
-  const colores = ["AZUL", "VERDE", "AMARILLO", "NARANJA", "ROJO"];
-
-  const cargarDatos = async () => {
+  const cargarDatos = useCallback(async () => {
     try {
-      const resP = await fetch('http://localhost:3000/autorizacion/presupuesto');
-      const dataP = await resP.json();
-      setPresupuesto(dataP?.presupuestoGlobal || 0);
+      const headers = getHeaders();
+      const [resP, resS] = await Promise.all([
+        fetch(ENDPOINTS.AUTORIZACION.PRESUPUESTO, { headers }),
+        fetch(ENDPOINTS.AUTORIZACION.PENDIENTES, { headers })
+      ]);
 
-      const resS = await fetch('http://localhost:3000/autorizacion/pendientes');
-      const dataS = await resS.json();
-      setPendientes(Array.isArray(dataS) ? dataS : []);
-    } catch (e) { console.error(e); }
+      if (resP.ok) {
+        const dataP = await resP.json();
+        setPresupuesto(dataP?.presupuestoGlobal || 0);
+      }
+
+      if (resS.ok) {
+        const dataS = await resS.json();
+        setPendientes(Array.isArray(dataS) ? dataS : []);
+      }
+    } catch (e) {
+      console.error("Error cargando datos de autorización:", e);
+    }
+  }, []);
+
+  useEffect(() => {
+    cargarDatos();
+  }, [cargarDatos]);
+
+  const handleDecision = async (cotizacionId: number) => {
+    if (!seleccionada) return;
+    setLoading(true);
+
+    try {
+      const res = await fetch(ENDPOINTS.AUTORIZACION.DECIDIR(seleccionada.id), {
+        method: 'POST',
+        headers: getHeaders(),
+        body: JSON.stringify({
+          cotizacionId,
+          nuevaPrioridad: prioridadManual
+        })
+      });
+
+      if (res.ok) {
+        alert("Solicitud autorizada y enviada a Compras");
+        setSeleccionada(null);
+        cargarDatos();
+      }
+    } catch (e) {
+      console.error(e);
+    } finally {
+      setLoading(false);
+    }
   };
-
-  useEffect(() => { cargarDatos(); }, []);
 
   const handleUpdatePresupuesto = async () => {
     const monto = parseFloat(nuevoMonto);
     if (isNaN(monto)) return;
-    await fetch('http://localhost:3000/autorizacion/presupuesto', {
-      method: 'PATCH',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ monto })
-    });
-    setNuevoMonto("");
-    cargarDatos();
-  };
 
-  const handleDecision = async (cotId: number) => {
-    // API FUNCIONANDO: Envía ID y Prioridad sin validar saldo localmente
-    await fetch(`http://localhost:3000/autorizacion/${seleccionada.id}/decidir`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        cotizacionId: cotId,
-        nuevaPrioridad: colorManual
-      })
-    });
-    setSeleccionada(null);
-    cargarDatos();
+    try {
+      const res = await fetch(ENDPOINTS.AUTORIZACION.PRESUPUESTO, {
+        method: 'PATCH',
+        headers: getHeaders(),
+        body: JSON.stringify({ monto })
+      });
+      if (res.ok) {
+        setPresupuesto(monto);
+        setNuevoMonto("");
+        alert("Presupuesto actualizado");
+      }
+    } catch (e) {
+      console.error(e);
+    }
   };
-
-  const todosLosMensajes = pendientes.flatMap(s =>
-    (s.mensajes || []).map((m: any) => ({ ...m, folio: s.folio }))
-  );
 
   return (
     <div className={styles.container}>
       <aside className={styles.sidebar}>
-        <div className={styles.sidebarHeader}>
-          <h2>SOLICITUDES</h2>
-          <div className={styles.notifWrapper}>
-            <button className={styles.bellBtn} onClick={() => setShowMsjs(true)}>
-              🔔 {todosLosMensajes.length > 0 && <span className={styles.badge}>{todosLosMensajes.length}</span>}
-            </button>
+        <div className={styles.budgetCard}>
+          <small>PRESUPUESTO GLOBAL</small>
+          <h2>${presupuesto.toLocaleString()}</h2>
+          <div className={styles.updateGroup}>
+            <input
+              type="number"
+              value={nuevoMonto}
+              onChange={e => setNuevoMonto(e.target.value)}
+              placeholder="Nuevo monto"
+            />
+            <button onClick={handleUpdatePresupuesto}>Actualizar</button>
           </div>
         </div>
 
-        <div className={styles.scrollArea}>
+        <div className={styles.list}>
+          <h3>PENDIENTES ({pendientes.length})</h3>
           {pendientes.map(sol => (
             <div
               key={sol.id}
-              className={`${styles.solCard} ${seleccionada?.id === sol.id ? styles.activeCard : ''}`}
-              onClick={() => {
-                setSeleccionada(sol);
-                setColorManual(sol.prioridad || "AZUL");
-              }}
+              className={`${styles.solCard} ${seleccionada?.id === sol.id ? styles.active : ''}`}
+              onClick={() => setSeleccionada(sol)}
             >
-              <div className={styles.cardHeader}>
-                <span className={styles.folio}>#{sol.folio}</span>
-                <div className={styles.statusDot} style={{ background: `var(--${sol.prioridad?.toLowerCase() || 'azul'})` }} />
+              <div className={styles.solHeader}>
+                <span className={styles.folio}>{sol.folio}</span>
+                <span className={styles.prioridadBadge} style={{backgroundColor: sol.prioridad}} />
               </div>
-              <p className={styles.empresaName}>{sol.empresa?.nombre}</p>
+              <p>{sol.empresa?.nombre}</p>
             </div>
           ))}
         </div>
       </aside>
 
-      <main className={styles.mainContent}>
-        <header className={styles.topBar}>
-          <div className={styles.budgetDisplay}>
-            <p className={styles.label}>PRESUPUESTO DISPONIBLE</p>
-            <h1>${presupuesto.toLocaleString()}</h1>
-          </div>
-          <div className={styles.budgetActions}>
-            <input
-              type="number"
-              className={styles.montoInput}
-              placeholder="Monto..."
-              value={nuevoMonto}
-              onChange={(e) => setNuevoMonto(e.target.value)}
-            />
-            <button className={styles.btnActualizar} onClick={handleUpdatePresupuesto}>ACTUALIZAR</button>
-          </div>
-        </header>
-
+      <main className={styles.main}>
         {seleccionada ? (
-          <div className={styles.detailsView}>
-            <div className={styles.detailHeader}>
-              <div>
-                <span className={styles.label}>ESTABLECER SEMÁFORO</span>
-                <div className={styles.colorOptions}>
-                  {colores.map(c => (
-                    <button
-                      key={c}
-                      className={`${styles.colorBtn} ${colorManual === c ? styles.colorActive : ''}`}
-                      style={{ background: `var(--${c.toLowerCase()})` }}
-                      onClick={() => setColorManual(c)}
-                    />
-                  ))}
-                </div>
-              </div>
+          <div className={styles.detailContainer}>
+            <div className={styles.topHeader}>
+              <h1>Gestión de Autorización: {seleccionada.folio}</h1>
+              <select
+                value={prioridadManual}
+                onChange={e => setPrioridadManual(e.target.value as PrioridadColor)}
+              >
+                <option value="AZUL">Prioridad: Azul</option>
+                <option value="VERDE">Prioridad: Verde</option>
+                <option value="AMARILLO">Prioridad: Amarillo</option>
+                <option value="NARANJA">Prioridad: Naranja</option>
+                <option value="ROJO">Prioridad: Rojo</option>
+              </select>
             </div>
 
             <div className={styles.cotizacionesGrid}>
-              {seleccionada.cotizaciones?.map((cot: any) => (
+              {seleccionada.cotizaciones.map((cot) => (
                 <div key={cot.id} className={styles.cotCard}>
                   <div className={styles.cotHeader}>
-                    <span>OPCIÓN PROVEEDOR</span>
-                    <h2 className={styles.monto}>${cot.monto.toLocaleString()}</h2>
-                    <p className={styles.provName}>{cot.proveedor}</p>
+                    <h4>{cot.proveedor}</h4>
+                    <span className={styles.monto}>${cot.monto.toLocaleString()}</span>
                   </div>
-                  <div className={styles.cotBody}>
-                     <p className={styles.obs}>{cot.observaciones || "Sin observaciones adicionales"}</p>
-                  </div>
-                  <button onClick={() => handleDecision(cot.id)} className={styles.mainAction}>
-                    {cot.monto > presupuesto ? "AUTORIZAR (EXCEDE SALDO)" : "AUTORIZAR PROPUESTA"}
+                  <p><strong>Cotizó:</strong> {cot.quienCotizo}</p>
+                  <p><strong>Notas:</strong> {cot.observaciones}</p>
+
+                  <button
+                    className={styles.btnAutorizar}
+                    disabled={loading}
+                    onClick={() => handleDecision(cot.id)}
+                  >
+                    {cot.monto > presupuesto ? "AUTORIZAR (SOBREPASA SALDO)" : "AUTORIZAR ESTA OPCIÓN"}
                   </button>
                 </div>
               ))}
             </div>
           </div>
         ) : (
-          <div className={styles.emptyState}>
-            <div className={styles.emptyIcon}>📂</div>
-            <p>Selecciona una solicitud para gestionar la autorización</p>
-          </div>
+          <div className={styles.empty}>Selecciona una solicitud para revisar cotizaciones</div>
         )}
       </main>
-
-      {showMsjs && (
-        <div className={styles.modalOverlay}>
-          <div className={styles.modalMsj}>
-            <div className={styles.modalHeader}>
-              <h3>HISTORIAL DE MENSAJES</h3>
-              <button onClick={() => setShowMsjs(false)} className={styles.btnClose}>&times;</button>
-            </div>
-            <div className={styles.msjList}>
-              {todosLosMensajes.map((m: any, i: number) => (
-                <div key={i} className={styles.msjItem}>
-                  <span className={styles.msjFolio}>FOLIO #{m.folio}</span>
-                  <p>{m.motivo}</p>
-                  <small>{new Date(m.fecha).toLocaleString()}</small>
-                </div>
-              ))}
-            </div>
-          </div>
-        </div>
-      )}
     </div>
   );
 }

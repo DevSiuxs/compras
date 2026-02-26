@@ -1,134 +1,125 @@
 'use client';
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
+import { ENDPOINTS, getHeaders } from '@/config/apiConfig';
+import { SolicitudAlmacen, AlmacenForm } from '@/types';
 import styles from './Almacen.module.css';
 
 export default function Almacen() {
-  const [pendientes, setPendientes] = useState<any[]>([]);
-  const [filtroFecha, setFiltroFecha] = useState('');
-  const [seleccionada, setSeleccionada] = useState<any>(null);
-  const [form, setForm] = useState({ nombre: '', apellidoPaterno: '', apellidoMaterno: '' });
+  const [pendientes, setPendientes] = useState<SolicitudAlmacen[]>([]);
+  const [filtroFecha, setFiltroFecha] = useState<string>('');
+  const [seleccionada, setSeleccionada] = useState<SolicitudAlmacen | null>(null);
+  const [loading, setLoading] = useState<boolean>(false);
 
-  const cargarPendientes = async () => {
-    try {
-      const res = await fetch('http://localhost:3000/almacen/pendientes');
-      if (res.ok) {
-        const data = await res.json();
-        setPendientes(data);
-      }
-    } catch (e) { console.error(e); }
-  };
-
-  useEffect(() => { cargarPendientes(); }, []);
-
-  // Función para filtrar por fecha en el frontend
-  const solicitudesFiltradas = pendientes.filter(s => {
-    if (!filtroFecha) return true;
-    const fechaSol = new Date(s.fechaCreacion).toISOString().split('T')[0];
-    return fechaSol === filtroFecha;
+  const [form, setForm] = useState<AlmacenForm>({
+    nombre: '',
+    apellidoPaterno: '',
+    apellidoMaterno: ''
   });
 
-  const handleDecision = async (id: number, decision: 'surtir' | 'no-stock') => {
-    if (decision === 'no-stock') {
-      await fetch(`http://localhost:3000/almacen/${id}/procesar`, {
-        method: 'PATCH',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ decision: 'no-stock' })
+  const cargarPendientes = useCallback(async () => {
+    try {
+      const res = await fetch(ENDPOINTS.ALMACEN.PENDIENTES, {
+        headers: getHeaders() // Uso de token y privilegios
       });
-      setSeleccionada(null);
-      cargarPendientes();
+      if (res.ok) {
+        const data: SolicitudAlmacen[] = await res.json();
+        setPendientes(data);
+      }
+    } catch (e) {
+      console.error("Error en Almacén:", e);
+    }
+  }, []);
+
+  useEffect(() => {
+    cargarPendientes();
+  }, [cargarPendientes]);
+
+  const handleDecision = async (id: number, decision: 'surtir' | 'no-stock') => {
+    setLoading(true);
+    try {
+      const res = await fetch(ENDPOINTS.ALMACEN.PROCESAR(id), {
+        method: 'PATCH',
+        headers: getHeaders(),
+        body: JSON.stringify({
+          decision,
+          // Si es surtir, enviamos los datos de quien recibe
+          ...(decision === 'surtir' && form)
+        })
+      });
+
+      if (res.ok) {
+        alert(decision === 'surtir' ? "Material entregado" : "Enviado a cotización");
+        setSeleccionada(null);
+        cargarPendientes();
+      }
+    } catch (e) {
+      console.error(e);
+    } finally {
+      setLoading(false);
     }
   };
 
-  const finalizarSurtido = async () => {
-    if (!seleccionada) return; // Seguridad contra el error de null
-    const res = await fetch(`http://localhost:3000/recepcion/${seleccionada.id}/entregar`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(form)
-    });
-    if (res.ok) {
-      alert("✅ Surtido finalizado con éxito.");
-      setSeleccionada(null);
-      cargarPendientes();
-    }
-  };
+  const solicitudesFiltradas = pendientes.filter(s => {
+    if (!filtroFecha) return true;
+    return s.fechaCreacion.split('T')[0] === filtroFecha;
+  });
 
   return (
     <div className={styles.container}>
-      {/* PANEL IZQUIERDO: NUEVAS SOLICITUDES */}
       <aside className={styles.sidebar}>
-        <div className={styles.headerSidebar}>
-          <h2 className={styles.azulClaro}>SOLICITUDES</h2>
-          <p className={styles.subtext}>POR REVISAR</p>
-        </div>
-        <div className={styles.scrollArea}>
-          {solicitudesFiltradas.map((sol: any) => (
+        <h2>PENDIENTES ALMACÉN</h2>
+        <input
+          type="date"
+          value={filtroFecha}
+          onChange={e => setFiltroFecha(e.target.value)}
+        />
+        <div className={styles.scrollList}>
+          {solicitudesFiltradas.map(sol => (
             <div
               key={sol.id}
-              className={`${styles.cardSolicitud} ${seleccionada?.id === sol.id ? styles.cardActive : ''}`}
+              className={`${styles.card} ${seleccionada?.id === sol.id ? styles.active : ''}`}
               onClick={() => setSeleccionada(sol)}
             >
-              <span className={styles.folio}>{sol.folio}</span>
-              <h4>{sol.area?.nombre || 'Sin Área'}</h4>
-              <p className={styles.fechaCard}>{new Date(sol.fechaCreacion).toLocaleDateString()}</p>
+              <p><strong>{sol.folio}</strong></p>
+              <p>{sol.empresa?.nombre}</p>
             </div>
           ))}
-          {solicitudesFiltradas.length === 0 && <p className={styles.emptyMsg}>No hay peticiones</p>}
         </div>
       </aside>
 
-      {/* PANEL DERECHO: FILTRADO Y ACCIONES */}
-      <main className={styles.mainPanel}>
-        <div className={styles.topBar}>
-          <div className={styles.filterGroup}>
-            <label>FILTRAR POR FECHA RECIBIDA:</label>
-            <input type="date" value={filtroFecha} onChange={(e) => setFiltroFecha(e.target.value)} />
-          </div>
-          <h3 className={styles.azulClaro}>GESTIÓN DE STOCK</h3>
-        </div>
-
+      <main className={styles.content}>
         {seleccionada ? (
-          <div className={styles.detalleContainer}>
-            <div className={styles.headerDetalle}>
-              <h1>FOLIO: {seleccionada.folio}</h1>
-              <p>{seleccionada.empresa?.nombre}</p>
-            </div>
-
-            <div className={styles.infoBox}>
-              <p><strong>Justificación:</strong> {seleccionada.justificacion}</p>
-              <div className={styles.itemsList}>
-                {seleccionada.items?.map((item: any, i: number) => (
-                  <div key={i} className={styles.itemRow}>
-                    • {item.cantidad} {item.unidad?.nombre} - {item.descripcion}
-                  </div>
-                ))}
+          <div className={styles.detail}>
+            <h3>Detalle: {seleccionada.folio}</h3>
+            {/* Mapeo de items sin 'any' */}
+            {seleccionada.items?.map(item => (
+              <div key={item.id}>
+                {item.cantidad} {item.unidad?.nombre} - {item.descripcion}
               </div>
-            </div>
+            ))}
 
-            <div className={styles.actionsGrid}>
-              <div className={styles.formEntrega}>
-                <h3 className={styles.azulClaro}>SI HAY STOCK - REGISTRAR ENTREGA</h3>
-                <input placeholder="Nombre de quien recibe" onChange={e => setForm({...form, nombre: e.target.value})} />
-                <div className={styles.rowInputs}>
-                  <input placeholder="A. Paterno" onChange={e => setForm({...form, apellidoPaterno: e.target.value})} />
-                  <input placeholder="A. Materno" onChange={e => setForm({...form, apellidoMaterno: e.target.value})} />
-                </div>
-                <button className={styles.btnSurtir} onClick={finalizarSurtido}>SURTIR Y FINALIZAR</button>
-              </div>
-
-              <div className={styles.noStockZone}>
-                <p>¿No cuentas con el material?</p>
-                <button className={styles.btnNoStock} onClick={() => handleDecision(seleccionada.id, 'no-stock')}>
-                  ENVIAR A COTIZACIÓN
-                </button>
-              </div>
+            <div className={styles.actions}>
+              <input
+                placeholder="Nombre recibe"
+                value={form.nombre}
+                onChange={e => setForm({...form, nombre: e.target.value})}
+              />
+              <button
+                disabled={loading || !form.nombre}
+                onClick={() => handleDecision(seleccionada.id, 'surtir')}
+              >
+                SURTIR
+              </button>
+              <button
+                disabled={loading}
+                onClick={() => handleDecision(seleccionada.id, 'no-stock')}
+              >
+                NO HAY STOCK
+              </button>
             </div>
           </div>
         ) : (
-          <div className={styles.placeholderMain}>
-            <div className={styles.radarIcon}>📡</div>
-            <h2>Selecciona una solicitud para procesar</h2>
-          </div>
+          <p>Selecciona una solicitud</p>
         )}
       </main>
     </div>
