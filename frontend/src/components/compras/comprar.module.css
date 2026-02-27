@@ -1,3 +1,4 @@
+/* comprar.module.css */
 .container {
   display: flex;
   height: 100vh;
@@ -12,72 +13,211 @@
   --brand: #00d2ff;
 }
 
-/* SIDEBAR MÁS ESTRECHO */
-.sidebar { width: 280px; background: #0a0a0a; border-right: 1px solid #151515; display: flex; flex-direction: column; }
-.sidebarHeader { padding: 1rem; border-bottom: 1px solid #151515; }
-.miniTag { font-size: 8px; letter-spacing: 2px; color: var(--brand); font-weight: 800; margin-bottom: 0.2rem; }
-.sidebarHeader h2 { font-size: 1rem; margin: 0; }
-
-.budgetCard { margin: 1rem; padding: 1rem; background: #111; border-radius: 12px; border: 1px solid #222; }
-.label { font-size: 9px; color: #555; font-weight: 800; letter-spacing: 1px; }
-.blueValue { font-size: 1.4rem; font-weight: 900; color: var(--brand); margin: 0; }
-
-.scrollArea { flex: 1; overflow-y: auto; padding: 0.5rem; }
-.solCard {
-  display: flex; justify-content: space-between; align-items: center;
-  padding: 0.8rem; border-radius: 8px; margin-bottom: 0.5rem;
-  cursor: pointer; transition: 0.2s; border: 1px solid transparent; background: #0d0d0d;
-}
-.activeCard { background: #151515; border-color: var(--brand); }
-.cardInfo .folio { font-size: 11px; color: var(--brand); font-weight: 800; }
-.cardInfo .empresa { font-size: 12px; color: #888; margin: 0; }
-.priorityDot { width: 8px; height: 8px; border-radius: 50%; }
-
-/* MAIN CONTENT AJUSTADO */
-.mainContent { flex: 1; display: flex; flex-direction: column; background: #050505; position: relative; }
-.detailView { padding: 1.5rem 2.5rem; display: flex; flex-direction: column; height: 100%; }
-
-.detailHeader {
-  display: flex; justify-content: space-between; align-items: center;
-  margin-bottom: 1.5rem; border-bottom: 1px solid #151515; padding-bottom: 1rem;
-}
-.headerInfo h1 { font-size: 1.5rem; margin: 0; }
-.priorityLabel {
-  display: inline-block; padding: 2px 8px; border: 1px solid;
-  border-radius: 4px; font-size: 9px; font-weight: 800; margin-bottom: 0.5rem;
+/* SIDEBAR */
+.sidebar {
+  width: 320px;
+  background: #0a0a0a;
+  border-right: 1px solid #1a1a1a;
+  display: flex;
+  flex-direction: column;
 }
 
-.contentGrid {
-  display: grid;
-  grid-template-columns: 1fr 320px;
-  gap: 2rem;
+.sidebarHeader {
+  padding: 1.5rem;
+  border-bottom: 1px solid #1a1a1a;
+  background: linear-gradient(to bottom, #0f0f0f, #0a0a0a);
+}
+
+.miniTag {
+  font-size: 10px;
+  letter-spacing: 2px;
+  color: var(--brand);
+  font-weight: 800;
+  text-transform: uppercase;
+  display: block;
+  margin-bottom: 0.5rem;
+}
+
+.list {
   flex: 1;
-  min-height: 0; /* Importante para que el scroll interno funcione */
+  overflow-y: auto;
+  padding: 1rem;
 }
 
-/* TABLA COMPACTA */
-.itemsSection { display: flex; flex-direction: column; min-height: 0; }
-.itemsSection h3 { font-size: 11px; color: #444; margin-bottom: 0.5rem; }
-.tableWrapper { background: #0a0a0a; border-radius: 12px; border: 1px solid #111; overflow-y: auto; flex: 1; }
-.table { width: 100%; border-collapse: collapse; font-size: 12px; }
-.table th { text-align: left; padding: 0.6rem; color: #444; font-size: 10px; position: sticky; top: 0; background: #0a0a0a; }
-.table td { padding: 0.6rem; border-bottom: 1px solid #111; color: #aaa; }
-
-/* COLUMNA DE PAGO COMPACTA */
-.paymentSection { display: flex; flex-direction: column; gap: 1rem; }
-.totalCard { background: #0d0d0d; padding: 1.5rem; border-radius: 16px; border: 1px solid #1a1a1a; text-align: center; }
-.totalAmount { font-size: 2.2rem; font-weight: 900; margin: 0.5rem 0; letter-spacing: -1px; }
-.obs { font-size: 11px; color: #666; font-style: italic; margin-top: 0.5rem; }
-
-.actions { display: flex; flex-direction: column; gap: 0.8rem; }
-.btnConfirm {
-  background: #fff; color: #000; border: none; padding: 1rem;
-  border-radius: 10px; font-weight: 900; cursor: pointer; font-size: 13px;
+.card {
+  background: #111;
+  border: 1px solid #222;
+  border-radius: 12px;
+  padding: 1rem;
+  margin-bottom: 1rem;
+  cursor: pointer;
+  transition: all 0.3s ease;
+  position: relative;
+  overflow: hidden;
 }
-.btnConfirm:hover { background: var(--brand); }
-.btnWarning { background: #1a0000; color: var(--rojo); border: 1px solid var(--rojo); }
 
-.btnMensaje { background: transparent; color: #444; border: 1px solid #222; padding: 0.8rem; border-radius: 10px; font-size: 11px; font-weight: 700; cursor: pointer; }
+.card:hover {
+  border-color: var(--brand);
+  background: #151515;
+}
 
-/* EMPTY STATE */
-.emptyState { flex: 1; display: flex; align-items: center; justify-content: center; color: #151515; font-weight: 900; font-size: 2rem; }
+.active {
+  border-color: var(--brand);
+  background: rgba(0, 210, 255, 0.05);
+  box-shadow: 0 0 15px rgba(0, 210, 255, 0.1);
+}
+
+.folio {
+  font-family: 'Courier New', Courier, monospace;
+  font-weight: 900;
+  color: var(--brand);
+  font-size: 1.1rem;
+}
+
+.empresa {
+  font-size: 0.9rem;
+  color: #aaa;
+  margin-top: 0.3rem;
+}
+
+/* MAIN CONTENT */
+.main {
+  flex: 1;
+  background: #050505;
+  display: flex;
+  flex-direction: column;
+  padding: 2rem;
+  overflow-y: auto;
+}
+
+.detailCard {
+  max-width: 900px;
+  width: 100%;
+  margin: 0 auto;
+  animation: fadeIn 0.4s ease-out;
+}
+
+.headerDetail {
+  margin-bottom: 2rem;
+  border-left: 4px solid var(--brand);
+  padding-left: 1.5rem;
+}
+
+.headerDetail h1 {
+  font-size: 2.5rem;
+  font-weight: 900;
+  margin: 0;
+  letter-spacing: -1px;
+}
+
+.azulClaro {
+  color: var(--brand);
+  font-size: 0.8rem;
+  letter-spacing: 2px;
+  font-weight: 800;
+  margin-bottom: 1rem;
+  text-transform: uppercase;
+}
+
+/* INPUTS Y FORMULARIO */
+.formEntrega {
+  background: #0d0d0d;
+  padding: 2rem;
+  border-radius: 20px;
+  border: 1px solid #1a1a1a;
+  margin-top: 2rem;
+}
+
+.montoInput {
+  width: 100%;
+  background: #000;
+  border: 1px solid #222;
+  border-radius: 8px;
+  padding: 12px 15px;
+  color: #fff;
+  font-size: 1rem;
+  margin-bottom: 1.5rem;
+  transition: border-color 0.3s;
+}
+
+.montoInput:focus {
+  outline: none;
+  border-color: var(--brand);
+  box-shadow: 0 0 10px rgba(0, 210, 255, 0.2);
+}
+
+.rowInputs {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 1rem;
+}
+
+.btnSurtir {
+  width: 100%;
+  background: var(--brand);
+  color: #000;
+  border: none;
+  padding: 1rem;
+  border-radius: 8px;
+  font-weight: 900;
+  font-size: 1rem;
+  cursor: pointer;
+  text-transform: uppercase;
+  letter-spacing: 1px;
+  transition: transform 0.2s, box-shadow 0.2s;
+}
+
+.btnSurtir:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 5px 20px rgba(0, 210, 255, 0.4);
+}
+
+.btnSurtir:disabled {
+  background: #333;
+  color: #666;
+  cursor: not-allowed;
+  transform: none;
+}
+
+/* INFO SECTION */
+.infoSection {
+  background: #0a0a0a;
+  padding: 1.5rem;
+  border-radius: 12px;
+  border: 1px solid #111;
+}
+
+.itemsList {
+  display: flex;
+  flex-direction: column;
+  gap: 0.8rem;
+}
+
+.itemRow {
+  padding: 0.8rem;
+  background: #0d0d0d;
+  border-radius: 6px;
+  color: #ccc;
+  font-size: 0.95rem;
+}
+
+/* PLACEHOLDER */
+.placeholderMain {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  height: 100%;
+  color: #333;
+}
+
+.radarIcon {
+  font-size: 5rem;
+  margin-bottom: 1rem;
+  opacity: 0.5;
+}
+
+@keyframes fadeIn {
+  from { opacity: 0; transform: translateY(10px); }
+  to { opacity: 1; transform: translateY(0); }
+}

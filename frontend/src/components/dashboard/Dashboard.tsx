@@ -6,8 +6,6 @@ import {
 } from 'recharts';
 import styles from './Dashboard.module.css';
 import { ENDPOINTS, getHeaders } from '@/config/apiConfig';
-// Importamos la interfaz extendida si tu endpoint devuelve graficoGastos,
-// o puedes ajustarlo si está dentro de DashboardData
 import { DashboardData } from '@/types';
 
 interface DashboardProps { alVerHistorial?: () => void; }
@@ -23,18 +21,17 @@ interface GraficoGasto {
   gasto: number;
 }
 
-// Interfaz extendida localmente por los datos que usas en este componente
+// Interfaz extendida localmente
 interface DashboardResponse extends DashboardData {
   graficoGastos?: GraficoGasto[];
 }
 
 export default function Dashboard({ alVerHistorial }: DashboardProps) {
-  // 1. Reemplazamos 'any' por la interfaz correspondiente
   const [data, setData] = useState<DashboardResponse | null>(null);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    // 2. Usamos el ENDPOINT y enviamos el Token de privilegios
+    // 1. Usamos el ENDPOINT centralizado que apunta al puerto 3000
     fetch(ENDPOINTS.REPORTES.DASHBOARD, {
       headers: getHeaders()
     })
@@ -54,10 +51,9 @@ export default function Dashboard({ alVerHistorial }: DashboardProps) {
 
   if (loading) return <div className={styles.loading}>Sincronizando con base de datos...</div>;
 
-  // --- VARIABLES DE SEGURIDAD (Si data es null o faltan campos) ---
+  // --- VARIABLES DE SEGURIDAD (Mismo cálculo que tienes) ---
   const presupuesto = data?.presupuestoRestante ?? 0;
   const gasto = data?.gastoTotal ?? 0;
-  // Eliminada la variable totalSolicitudes porque marcaba warning al no usarse en el JSX
   const secciones: SeccionesStatus = data?.conteoSecciones ?? {
     ALMACEN: 0, COTIZANDO: 0, AUTORIZAR: 0, COMPRAS: 0, RECEPCION: 0, FINALIZADO: 0
   };
@@ -71,7 +67,7 @@ export default function Dashboard({ alVerHistorial }: DashboardProps) {
   return (
     <div className={styles.container} style={{ flexDirection: 'column', overflowY: 'auto', gap: '2rem', padding: '2rem' }}>
 
-      {/* TARJETAS DE DINERO */}
+      {/* TARJETAS DE DINERO - TU DISEÑO ORIGINAL */}
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(300px, 1fr))', gap: '1.5rem' }}>
         <div className={styles.chartCard} style={{ borderTop: '4px solid #00ff41' }}>
           <small style={{ color: '#666' }}>PRESUPUESTO DISPONIBLE</small>
@@ -92,9 +88,8 @@ export default function Dashboard({ alVerHistorial }: DashboardProps) {
         </div>
       </div>
 
-      {/* ESTADO DEL FLUJO */}
+      {/* ESTADO DEL FLUJO - TU DISEÑO ORIGINAL */}
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(140px, 1fr))', gap: '1rem' }}>
-        {/* Eliminamos el 'any' tipando el Object.entries */}
         {Object.entries(secciones).map(([key, val]: [string, number]) => (
           <div key={key} className={styles.miniCard} style={{ textAlign: 'center', border: val > 0 ? '1px solid #0070f3' : '1px solid #1a1a1a' }}>
             <span style={{ fontSize: '10px', color: '#444' }}>{key}</span>
@@ -103,7 +98,7 @@ export default function Dashboard({ alVerHistorial }: DashboardProps) {
         ))}
       </div>
 
-      {/* GRÁFICA Y BOTÓN */}
+      {/* GRÁFICA Y BOTÓN - TU DISEÑO ORIGINAL */}
       <div style={{ display: 'grid', gridTemplateColumns: '2fr 1fr', gap: '2rem' }}>
         <div className={styles.chartCard} style={{ height: '350px' }}>
           <h3 style={{fontSize: '12px', marginBottom: '1rem'}}>HISTORIAL DE COMPRAS (Últimos 10 folios)</h3>
@@ -114,7 +109,6 @@ export default function Dashboard({ alVerHistorial }: DashboardProps) {
               <YAxis stroke="#444" fontSize={10} />
               <Tooltip contentStyle={{ background: '#000', border: '1px solid #222' }} />
               <Bar dataKey="gasto" radius={[5, 5, 0, 0]}>
-                {/* Reemplazamos 'any' por GraficoGasto en el map */}
                 {grafico.map((_item: GraficoGasto, index: number) => (
                   <Cell key={`cell-${index}`} fill={index % 2 === 0 ? '#0070f3' : '#7928ca'} />
                 ))}

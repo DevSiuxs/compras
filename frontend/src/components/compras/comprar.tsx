@@ -1,105 +1,125 @@
 'use client';
-import { useState, useEffect } from 'react';
-import styles from './comprar.module.css'; // Ocupa el mismo CSS de Almacen o Compras
+import { useState, useEffect, useCallback } from 'react';
+import styles from './comprar.module.css';
 import { ENDPOINTS, getHeaders } from '@/config/apiConfig';
+import { SolicitudAutorizable } from '@/types';
 
-export default function Recepcion() {
-  const [pendientes, setPendientes] = useState<any[]>([]);
-  const [seleccionada, setSeleccionada] = useState<any>(null);
-  const [form, setForm] = useState({ nombre: '', apellidoPaterno: '', apellidoMaterno: '' });
+export default function ComprasPagina() {
+  const [pendientes, setPendientes] = useState<SolicitudAutorizable[]>([]);
+  const [seleccionada, setSeleccionada] = useState<SolicitudAutorizable | null>(null);
+  const [loading, setLoading] = useState(false);
 
-  const cargarDatos = async () => {
+  const cargarDatos = useCallback(async () => {
     try {
-      const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/recepcion/pendientes`, { headers: getHeaders() });
-      if (res.ok) setPendientes(await res.json());
-    } catch (e) { console.error(e); }
-  };
-
-  useEffect(() => { cargarDatos(); }, []);
-
-  const finalizarSurtido = async () => {
-    if (!form.nombre || !form.apellidoPaterno) return alert("Faltan datos de quien recibe");
-
-    try {
-      const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/recepcion/${seleccionada.id}/finalizar`, {
-        method: 'POST',
-        headers: getHeaders(),
-        body: JSON.stringify(form)
+      // USAMOS EL ENDPOINT DE COMPRAS (que apunta a /compras/pendientes)
+      const res = await fetch(ENDPOINTS.COMPRAS.PENDIENTES, {
+        headers: getHeaders()
       });
+
       if (res.ok) {
-        setSeleccionada(null);
-        cargarDatos();
+        const data = await res.json();
+        setPendientes(Array.isArray(data) ? data : []);
       }
-    } catch (e) { console.error(e); }
+    } catch (e) {
+      console.error("Error cargando compras:", e);
+    }
+  }, []);
+
+  useEffect(() => {
+    cargarDatos();
+  }, [cargarDatos]);
+
+  const finalizarCompra = async () => {
+    if (!seleccionada) return;
+
+    setLoading(true);
+    try {
+      // USAMOS EL MÉTODO EJECUTAR QUE TIENES EN TU BACKEND
+      const res = await fetch(ENDPOINTS.COMPRAS.EJECUTAR(seleccionada.id), {
+        method: 'POST',
+        headers: getHeaders()
+      });
+
+      if (res.ok) {
+        alert("Compra ejecutada. El material ahora está en Recepción/Almacén.");
+        setSeleccionada(null);
+        await cargarDatos();
+      } else {
+        const err = await res.json();
+        alert(err.message || "Error al ejecutar compra");
+      }
+    } catch (e) {
+      console.error(e);
+    } finally {
+      setLoading(false);
+    }
   };
 
   return (
     <div className={styles.container}>
       <aside className={styles.sidebar}>
-        <div className={styles.headerSidebar}>
-          <span className={styles.subtext}>RECEPCIÓN DE MATERIAL</span>
-          <h2 className={styles.azulClaro}>ORDENES EN CAMINO</h2>
+        <div className={styles.sidebarHeader}>
+          <span className={styles.miniTag}>ORDENES DE COMPRA</span>
+          <h2>POR EJECUTAR</h2>
         </div>
-        <div className={styles.scrollArea}>
-          {pendientes.map(s => (
-            <div
-              key={s.id}
-              className={`${styles.cardSolicitud} ${seleccionada?.id === s.id ? styles.active : ''}`}
-              onClick={() => setSeleccionada(s)}
-            >
-              <div className="flex justify-between">
-                <span className="text-white font-mono">{s.folio}</span>
-                <span className={styles.statusTag}>{s.status}</span>
+        <div className={styles.list}>
+          {pendientes.length === 0 ? (
+            <p style={{ padding: '1rem', opacity: 0.5 }}>No hay compras pendientes</p>
+          ) : (
+            pendientes.map((sol) => (
+              <div
+                key={sol.id}
+                className={`${styles.card} ${seleccionada?.id === sol.id ? styles.active : ''}`}
+                onClick={() => setSeleccionada(sol)}
+              >
+                <span className={styles.folio}>#{sol.folio}</span>
+                <p className={styles.empresa}>{sol.empresa?.nombre}</p>
+                {/* Mostramos el monto de la cotización seleccionada */}
+                <strong className={styles.azulClaro}>
+                  ${sol.cotizaciones?.find(c => c.seleccionada)?.monto.toLocaleString()}
+                </strong>
               </div>
-              <p className="text-[10px] text-gray-500 mt-2">{s.empresa?.nombre}</p>
-            </div>
-          ))}
+            ))
+          )}
         </div>
       </aside>
 
-      <main className={styles.mainContent}>
+      <main className={styles.main}>
         {seleccionada ? (
-          <div className={styles.detalleContainer}>
-            <div className={styles.infoBox}>
-              <h1 className={styles.azulClaro}>FOLIO: {seleccionada.folio}</h1>
-              <p>PROVEEDOR: {seleccionada.proveedorFinal}</p>
-              <div className={styles.itemsList}>
-                {seleccionada.items?.map((item: any) => (
-                  <div key={item.id} className={styles.itemRow}>
-                    • {item.cantidad} {item.unidad?.nombre} - {item.descripcion}
-                  </div>
+          <div className={styles.detailCard}>
+            <h1>ORDEN DE COMPRA: {seleccionada.folio}</h1>
+
+            <div className={styles.infoSection}>
+              <h3 className={styles.azulClaro}>PROVEEDOR ELEGIDO</h3>
+              <p>{seleccionada.cotizaciones?.find(c => c.seleccionada)?.proveedor}</p>
+
+              <h3 className={styles.azulClaro} style={{marginTop: '20px'}}>MATERIAL</h3>
+              <ul>
+                {seleccionada.items?.map(item => (
+                  <li key={item.id}>{item.cantidad} {item.unidad?.nombre} - {item.descripcion}</li>
                 ))}
-              </div>
+              </ul>
             </div>
 
-            <div className={styles.formEntrega}>
-              <h3 className={styles.azulClaro}>REGISTRAR ENTRADA A ALMACÉN</h3>
-              <input
-                placeholder="Nombre de quien recibe"
-                value={form.nombre}
-                onChange={e => setForm({...form, nombre: e.target.value})}
-              />
-              <div className={styles.rowInputs}>
-                <input
-                  placeholder="A. Paterno"
-                  value={form.apellidoPaterno}
-                  onChange={e => setForm({...form, apellidoPaterno: e.target.value})}
-                />
-                <input
-                  placeholder="A. Materno"
-                  value={form.apellidoMaterno}
-                  onChange={e => setForm({...form, apellidoMaterno: e.target.value})}
-                />
-              </div>
-              <button className={styles.btnSurtir} onClick={finalizarSurtido}>
-                CONFIRMAR RECEPCIÓN Y CERRAR FOLIO
-              </button>
+            <div className={styles.totalCard}>
+               <p>TOTAL A PAGAR</p>
+               <h2 className={styles.totalAmount}>
+                 ${seleccionada.cotizaciones?.find(c => c.seleccionada)?.monto.toLocaleString()}
+               </h2>
             </div>
+
+            <button
+              className={styles.btnConfirm}
+              onClick={finalizarCompra}
+              disabled={loading}
+            >
+              {loading ? 'PROCESANDO...' : 'CONFIRMAR COMPRA REALIZADA'}
+            </button>
           </div>
         ) : (
           <div className={styles.placeholderMain}>
-            <div className={styles.radarIcon}>📦</div>
-            <h2>Esperando llegada de material...</h2>
+             <div className={styles.radarIcon}>💰</div>
+             <h2>Selecciona una solicitud autorizada para confirmar la compra</h2>
           </div>
         )}
       </main>

@@ -1,26 +1,27 @@
 'use client';
 import { useState, useEffect } from 'react';
 import styles from './Almacen.module.css';
-import { ENDPOINTS, getHeaders } from '@/config/apiConfig'; // Importación correcta
+import { ENDPOINTS, getHeaders } from '@/config/apiConfig';
+import { SolicitudAlmacen, AlmacenForm, ItemSolicitud } from '@/types'; // Importación de tipos reales
 
 export default function Almacen() {
-  const [pendientes, setPendientes] = useState<any[]>([]);
+  const [pendientes, setPendientes] = useState<SolicitudAlmacen[]>([]); // Sin any
   const [filtroFecha, setFiltroFecha] = useState('');
-  const [seleccionada, setSeleccionada] = useState<any>(null);
+  const [seleccionada, setSeleccionada] = useState<SolicitudAlmacen | null>(null); // Sin any
   const [loading, setLoading] = useState(false);
-  const [form, setForm] = useState({ nombre: '', apellidoPaterno: '', apellidoMaterno: '' });
+  const [form, setForm] = useState<AlmacenForm>({ nombre: '', apellidoPaterno: '', apellidoMaterno: '' });
+
+  
 
   const cargarPendientes = async () => {
     try {
-      const res = await fetch(ENDPOINTS.ALMACEN.PENDIENTES, {
-        headers: getHeaders()
-      });
+      const res = await fetch(ENDPOINTS.ALMACEN.PENDIENTES, { headers: getHeaders() });
       if (res.ok) {
-        const data = await res.json();
+        const data: SolicitudAlmacen[] = await res.json();
         setPendientes(data);
       }
     } catch (e) {
-      console.error("Error cargando pendientes de almacén", e);
+      console.error("Error cargando pendientes", e);
     }
   };
 
@@ -44,7 +45,7 @@ export default function Almacen() {
       if (res.ok) {
         alert(decision === 'surtir' ? "¡Material surtido!" : "Enviado a cotización");
         setSeleccionada(null);
-        cargarPendientes(); // Recargar lista
+        cargarPendientes();
       }
     } catch (e) {
       console.error(e);
@@ -55,6 +56,9 @@ export default function Almacen() {
   };
 
   const finalizarSurtido = () => {
+    // 1. EL FIX: Verificamos que 'seleccionada' no sea null antes de usar su ID
+    if (!seleccionada) return;
+
     if(!form.nombre || !form.apellidoPaterno) {
       alert("Por favor, ingresa quién recibe el material");
       return;

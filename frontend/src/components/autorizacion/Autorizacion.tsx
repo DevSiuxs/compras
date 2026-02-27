@@ -59,7 +59,12 @@ export default function Autorizar() {
     cargarDatos();
   };
 
-  const todosLosMensajes = pendientes.flatMap(s =>
+  // TIPADO CORRECTO: Definimos la interfaz para los mensajes con folio
+  interface MensajeConFolio extends MensajeHistorial {
+    folio?: string;
+  }
+
+  const todosLosMensajes: MensajeConFolio[] = pendientes.flatMap(s =>
     (s.mensajes || []).map((m: MensajeHistorial) => ({ ...m, folio: s.folio }))
   );
 
@@ -165,7 +170,8 @@ export default function Autorizar() {
               <button onClick={() => setShowMsjs(false)} className={styles.btnClose}>&times;</button>
             </div>
             <div className={styles.msjList}>
-              {todosLosMensajes.map((m: any, i: number) => (
+              {/* CAMBIO ÚNICO: m: any -> m: MensajeConFolio para que compile */}
+              {todosLosMensajes.map((m: MensajeConFolio, i: number) => (
                 <div key={i} className={styles.msjItem}>
                   <span className={styles.msjFolio}>FOLIO #{m.folio}</span>
                   <p>{m.motivo}</p>

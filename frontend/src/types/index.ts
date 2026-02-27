@@ -175,5 +175,7 @@ export interface DashboardData {
     COMPRAS: number;
     RECIBIDO: number;
   };
-  solicitudes: SolicitudHistorial[];
+  
+  porPrioridad: Record<string, number>;
+  solicitudes: any[]; // Cambia any[] por SolicitudHistorial[] si ya tienes ese tipo
 }

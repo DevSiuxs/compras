@@ -1,26 +1,27 @@
 'use client';
 import { useState, useEffect, useCallback } from 'react';
 import styles from './recepcion.module.css';
-import { ENDPOINTS, getHeaders } from '@/config/apiConfig'; // Ajusta la ruta según tu estructura
-import { SolicitudRecepcion, FinalizarRecepcionDTO } from '@/types'; // Ajusta la ruta según tu estructura
+import { ENDPOINTS, getHeaders } from '@/config/apiConfig';
+import { SolicitudRecepcion, FinalizarRecepcionDTO, ItemSolicitud } from '@/types';
 
 export default function Recepcion() {
-  // Tipado estricto eliminando 'any'
+  // 1. Tipado estricto para evitar errores de ESLint
   const [pendientes, setPendientes] = useState<SolicitudRecepcion[]>([]);
   const [seleccionada, setSeleccionada] = useState<SolicitudRecepcion | null>(null);
+  const [loading, setLoading] = useState(false);
+
   const [form, setForm] = useState<FinalizarRecepcionDTO>({
     nombre: '',
     apellidoPaterno: '',
     apellidoMaterno: ''
   });
 
-  // Usamos useCallback para evitar recrear la función en cada render
   const cargarPendientes = useCallback(async () => {
     try {
       const res = await fetch(ENDPOINTS.RECEPCION.PENDIENTES, {
-        headers: getHeaders(), // Incluimos token por privilegios
+        headers: getHeaders(), // Envío de token para privilegios
       });
-      if (!res.ok) throw new Error('Error al cargar pendientes');
+      if (!res.ok) throw new Error('Error al cargar');
       const data = await res.json();
       setPendientes(Array.isArray(data) ? data : []);
     } catch (error) {
@@ -34,48 +35,47 @@ export default function Recepcion() {
 
   const handleEntregar = async () => {
     if (!seleccionada) return;
-    if (!form.nombre || !form.apellidoPaterno || !form.apellidoMaterno) {
-      return alert("Por favor llene todos los campos obligatorios");
+    if (!form.nombre || !form.apellidoPaterno) {
+      return alert("Debes indicar quién recibe el material");
     }
 
+    setLoading(true);
     try {
-      // Usamos el ENDPOINT dinámico del config
-      const res = await fetch(ENDPOINTS.RECEPCION.ENTREGAR(seleccionada.id), {
+      const res = await fetch(ENDPOINTS.RECEPCION.FINALIZAR(seleccionada.id), {
         method: 'POST',
         headers: getHeaders(),
         body: JSON.stringify(form)
       });
 
       if (res.ok) {
-        alert("✅ Orden entregada con éxito.");
         setSeleccionada(null);
         setForm({ nombre: '', apellidoPaterno: '', apellidoMaterno: '' });
-        cargarPendientes();
-      } else {
-        const errorData = await res.json();
-        alert(`Error: ${errorData.message || 'No se pudo procesar la entrega'}`);
+        await cargarPendientes();
+        alert("Recepción finalizada con éxito");
       }
     } catch (error) {
-      console.error("Error al entregar:", error);
-      alert("Error de conexión con el servidor");
+      console.error(error);
+    } finally {
+      setLoading(false);
     }
   };
 
   return (
     <div className={styles.container}>
       <aside className={styles.sidebar}>
-        <h2 className={styles.azulClaro} style={{ letterSpacing: '3px', fontSize: '14px' }}>
-          ENTREGAS PENDIENTES
-        </h2>
-        <div style={{ marginTop: '2rem' }}>
-          {pendientes.map((s) => (
+        <div className={styles.sidebarHeader}>
+          <span className={styles.miniTag}>LOGÍSTICA</span>
+          <h2>RECEPCIÓN</h2>
+        </div>
+        <div className={styles.list}>
+          {pendientes.map((sol) => (
             <div
-              key={s.id}
-              className={`${styles.card} ${seleccionada?.id === s.id ? styles.cardActive : ''}`}
-              onClick={() => setSeleccionada(s)}
+              key={sol.id}
+              className={`${styles.card} ${seleccionada?.id === sol.id ? styles.active : ''}`}
+              onClick={() => setSeleccionada(sol)}
             >
-              <strong className={styles.azulClaro}>#{s.folio}</strong>
-              <p style={{ margin: '5px 0', fontSize: '13px' }}>{s.area?.nombre}</p>
+              <span className={styles.folio}>#{sol.folio}</span>
+              <p className={styles.empresa}>{sol.empresa?.nombre}</p>
             </div>
           ))}
         </div>
@@ -83,44 +83,67 @@ export default function Recepcion() {
 
       <main className={styles.main}>
         {seleccionada ? (
-          <div className={styles.formulario}>
-            <h1 className={styles.azulClaro}>REGISTRO DE SALIDA</h1>
-            <p style={{ color: '#555' }}>Confirmar entrega física del material comprado.</p>
+          <div className={styles.detailCard}>
+            <div className={styles.headerDetail}>
+              <h1>FOLIO {seleccionada.folio}</h1>
+              <p className={styles.sub}>{seleccionada.empresa?.nombre} — {seleccionada.area?.nombre}</p>
+            </div>
 
-            <div className={styles.gridForm}>
-              <div className={styles.field}>
-                <label>Nombre Completo</label>
-                <input
-                  value={form.nombre}
-                  onChange={e => setForm({ ...form, nombre: e.target.value })}
-                  placeholder="Quien recibe..."
-                />
-              </div>
-              <div style={{ display: 'flex', gap: '15px' }}>
-                <div className={styles.field} style={{ flex: 1 }}>
-                  <label>Apellido Paterno</label>
-                  <input
-                    value={form.apellidoPaterno}
-                    onChange={e => setForm({ ...form, apellidoPaterno: e.target.value })}
-                  />
-                </div>
-                <div className={styles.field} style={{ flex: 1 }}>
-                  <label>Apellido Materno</label>
-                  <input
-                    value={form.apellidoMaterno}
-                    onChange={e => setForm({ ...form, apellidoMaterno: e.target.value })}
-                  />
-                </div>
+            <div className={styles.infoSection}>
+              <h3 className={styles.azulClaro}>MATERIAL A RECIBIR</h3>
+              <div className={styles.itemsList}>
+                {seleccionada.items?.map((item: ItemSolicitud) => (
+                  <div key={item.id} className={styles.itemRow}>
+                    • {item.cantidad} {item.unidad?.nombre} - {item.descripcion}
+                  </div>
+                ))}
               </div>
             </div>
 
-            <button className={styles.btnAceptar} onClick={handleEntregar}>
-              FINALIZAR Y MARCAR COMO ENTREGADO
-            </button>
+            <div className={styles.formEntrega}>
+              <h3 className={styles.azulClaro}>DATOS DE QUIEN RECIBE</h3>
+              <div className={styles.field}>
+                <label className={styles.label}>NOMBRE COMPLETO</label>
+                <input
+                  className={styles.montoInput} // Usamos tu clase de diseño
+                  value={form.nombre}
+                  onChange={e => setForm({ ...form, nombre: e.target.value })}
+                  placeholder="Nombre..."
+                />
+              </div>
+              <div className={styles.rowInputs}>
+                <div className={styles.field}>
+                  <label className={styles.label}>APELLIDO PATERNO</label>
+                  <input
+                    className={styles.montoInput}
+                    value={form.apellidoPaterno}
+                    onChange={e => setForm({ ...form, apellidoPaterno: e.target.value })}
+                    placeholder="Paterno..."
+                  />
+                </div>
+                <div className={styles.field}>
+                  <label className={styles.label}>APELLIDO MATERNO</label>
+                  <input
+                    className={styles.montoInput}
+                    value={form.apellidoMaterno}
+                    onChange={e => setForm({ ...form, apellidoMaterno: e.target.value })}
+                    placeholder="Materno..."
+                  />
+                </div>
+              </div>
+              <button
+                className={styles.btnSurtir}
+                onClick={handleEntregar}
+                disabled={loading}
+              >
+                {loading ? 'PROCESANDO...' : 'CONFIRMAR RECEPCIÓN Y CERRAR FOLIO'}
+              </button>
+            </div>
           </div>
         ) : (
-          <div style={{ textAlign: 'center', marginTop: '15%', opacity: 0.3 }}>
-            <h2 style={{ fontSize: '3rem' }}>ESPERANDO SELECCIÓN</h2>
+          <div className={styles.placeholderMain}>
+            <div className={styles.radarIcon}>📦</div>
+            <h2>Esperando selección de material...</h2>
           </div>
         )}
       </main>
