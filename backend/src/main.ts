@@ -13,7 +13,8 @@ async function bootstrap() {
   });
 
   // El Backend escuchará en el puerto 3000
-  await app.listen(3000);
+  // En tu main.ts de NestJS
+    await app.listen(3000, '0.0.0.0'); // Forzamos a que acepte conexiones de cualquier IP local
   console.log('Servidor corriendo en http://localhost:3000');
 }
 bootstrap();

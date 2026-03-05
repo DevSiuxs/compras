@@ -1,2 +1,0 @@
-para cargar los colores del semaforo
-npx prisma db seed
